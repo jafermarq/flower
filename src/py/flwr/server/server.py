@@ -166,7 +166,7 @@ class Server:
         if self.virtual_client_pool:
             results = []
             failures = []
-            with tqdm(total=self.strategy.min_fit_clients, desc='Clients fitted') as t:
+            with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
                 while len(results) < self.strategy.min_fit_clients:
 
                     # Get clients and their respective instructions from strategy
