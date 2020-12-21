@@ -19,6 +19,7 @@ import concurrent.futures
 import timeit
 from logging import DEBUG, INFO
 from typing import List, Optional, Tuple, cast
+from tqdm import tqdm
 
 from flwr.common import (
     Disconnect,
@@ -165,34 +166,37 @@ class Server:
         if self.virtual_client_pool:
             results = []
             failures = []
-            while len(results) < self.strategy.min_fit_clients:
+            with tqdm(total=self.strategy.min_fit_clients, desc='Clients fitted') as t:
+                while len(results) < self.strategy.min_fit_clients:
 
-                # Get clients and their respective instructions from strategy
-                client_instructions = self.strategy.configure_fit(
-                    rnd=rnd, weights=self.weights, client_manager=self._client_manager
-                )
-                log(
-                    DEBUG,
-                    "fit_round: strategy sampled %s clients (out of %s)",
-                    len(client_instructions),
-                    self._client_manager.num_available(),
-                )
-                if not client_instructions:
-                    log(INFO, "fit_round: no clients sampled, cancel fit")
-                    return None
+                    # Get clients and their respective instructions from strategy
+                    client_instructions = self.strategy.configure_fit(
+                        rnd=rnd, weights=self.weights, client_manager=self._client_manager
+                    )
+                    # log(
+                    #     DEBUG,
+                    #     "fit_round: strategy sampled %s clients (out of %s)",
+                    #     len(client_instructions),
+                    #     self._client_manager.num_available(),
+                    # )
+                    if not client_instructions:
+                        log(INFO, "fit_round: no clients sampled, cancel fit")
+                        return None
 
-                # obtain results
-                results_, failures_ = fit_clients(client_instructions)
+                    # obtain results
+                    results_, failures_ = fit_clients(client_instructions)
 
-                # add to lists
-                results += results_
-                failures += failures_
+                    # add to lists
+                    results += results_
+                    failures += failures_
 
-                # shut down clients
-                all_clients = self._client_manager.all()
-                _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
+                    # shut down clients
+                    all_clients = self._client_manager.all()
+                    _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
 
-                print(f"fit_round() {len(results)}/{self.strategy.min_fit_clients}")
+                    # print(f"fit_round() {len(results)}/{self.strategy.min_fit_clients}")
+                    t.set_postfix({'results': f"{len(results)}", 'failures':f"{len(failures)}"})
+                    t.update(len(results_))
         else:
             # Get clients and their respective instructions from strategy
             client_instructions = self.strategy.configure_fit(
