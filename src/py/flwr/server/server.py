@@ -54,11 +54,14 @@ class Server:
     """Flower server."""
 
     def __init__(
-        self, client_manager: ClientManager, strategy: Optional[Strategy] = None
+        self, client_manager: ClientManager,
+        strategy: Optional[Strategy] = None,
+        virtual_client_pool: bool = False
     ) -> None:
         self._client_manager: ClientManager = client_manager
         self.weights: Weights = []
         self.strategy: Strategy = set_strategy(strategy)
+        self.virtual_client_pool = virtual_client_pool
 
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
@@ -87,6 +90,8 @@ class Server:
 
         for current_round in range(1, num_rounds + 1):
             # Train model and replace previous global model
+            #! Here, while `weights_prime` doesn't have as many client's results as
+            #! defined as a minimum per round.
             weights_prime = self.fit_round(rnd=current_round)
             if weights_prime is not None:
                 self.weights = weights_prime
@@ -156,22 +161,56 @@ class Server:
 
     def fit_round(self, rnd: int) -> Optional[Weights]:
         """Perform a single round of federated averaging."""
-        # Get clients and their respective instructions from strategy
-        client_instructions = self.strategy.configure_fit(
-            rnd=rnd, weights=self.weights, client_manager=self._client_manager
-        )
-        log(
-            DEBUG,
-            "fit_round: strategy sampled %s clients (out of %s)",
-            len(client_instructions),
-            self._client_manager.num_available(),
-        )
-        if not client_instructions:
-            log(INFO, "fit_round: no clients sampled, cancel fit")
-            return None
+        # ! this can certainly be done in a nicer way...
+        if self.virtual_client_pool:
+            results = []
+            failures = []
+            while len(results) < self.strategy.min_fit_clients:
 
-        # Collect training results from all clients participating in this round
-        results, failures = fit_clients(client_instructions)
+                # Get clients and their respective instructions from strategy
+                client_instructions = self.strategy.configure_fit(
+                    rnd=rnd, weights=self.weights, client_manager=self._client_manager
+                )
+                log(
+                    DEBUG,
+                    "fit_round: strategy sampled %s clients (out of %s)",
+                    len(client_instructions),
+                    self._client_manager.num_available(),
+                )
+                if not client_instructions:
+                    log(INFO, "fit_round: no clients sampled, cancel fit")
+                    return None
+
+                # obtain results
+                results_, failures_ = fit_clients(client_instructions)
+
+                # add to lists
+                results += results_
+                failures += failures_
+
+                # shut down clients
+                all_clients = self._client_manager.all()
+                _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
+
+                print(f"fit_round() {len(results)}/{self.strategy.min_fit_clients}")
+        else:
+            # Get clients and their respective instructions from strategy
+            client_instructions = self.strategy.configure_fit(
+                rnd=rnd, weights=self.weights, client_manager=self._client_manager
+            )
+            log(
+                DEBUG,
+                "fit_round: strategy sampled %s clients (out of %s)",
+                len(client_instructions),
+                self._client_manager.num_available(),
+            )
+            if not client_instructions:
+                log(INFO, "fit_round: no clients sampled, cancel fit")
+                return None
+
+            # Collect training results from all clients participating in this round
+            results, failures = fit_clients(client_instructions)
+
         log(
             DEBUG,
             "fit_round received %s results and %s failures",

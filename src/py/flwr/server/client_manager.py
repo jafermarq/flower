@@ -122,6 +122,7 @@ class SimpleClientManager(ClientManager):
         num_clients: int,
         min_num_clients: Optional[int] = None,
         criterion: Optional[Criterion] = None,
+        virtual_pool: Optional[bool] = None,
     ) -> List[ClientProxy]:
         """Sample a number of Flower ClientProxy instances."""
         # Block until at least num_clients are connected.
@@ -134,5 +135,7 @@ class SimpleClientManager(ClientManager):
             available_cids = [
                 cid for cid in available_cids if criterion.select(self.clients[cid])
             ]
+        if virtual_pool:
+            num_clients = min(len(available_cids), num_clients)
         sampled_cids = random.sample(available_cids, num_clients)
         return [self.clients[cid] for cid in sampled_cids]
