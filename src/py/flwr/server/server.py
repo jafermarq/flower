@@ -91,8 +91,6 @@ class Server:
 
         for current_round in range(1, num_rounds + 1):
             # Train model and replace previous global model
-            #! Here, while `weights_prime` doesn't have as many client's results as
-            #! defined as a minimum per round.
             weights_prime = self.fit_round(rnd=current_round)
             if weights_prime is not None:
                 self.weights = weights_prime
