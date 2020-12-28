@@ -18,7 +18,7 @@ from enum import Enum
 from threading import Condition
 from typing import Iterator, Optional
 
-from flwr.proto.transport_pb2 import ClientMessage, ServerMessage
+from flwr.proto.transport_pb2 import ClientMessage, ServerMessage, VirtualClientManagerMessage, RemoteClientManagerMessage
 
 
 class GRPCBridgeClosed(Exception):
@@ -159,6 +159,80 @@ class GRPCBridge:
             yield server_message
 
     def set_client_message(self, client_message: ClientMessage) -> None:
+        """Set client message for consumption."""
+        with self._cv:
+            self._raise_if_closed()
+
+            if self._status != Status.AWAITING_CLIENT_MESSAGE:
+                raise Exception("This should not happen")
+
+            self._client_message = client_message  # Write
+            self._transition(Status.CLIENT_MESSAGE_AVAILABLE)
+
+
+class GRPCBridge_VCM(GRPCBridge):
+    """ Same as GRPCBridge but adapted for
+    RemoteClientManager <--> VirtualClientManager connections. """
+    def __init__(self) -> None:
+        super(GRPCBridge_VCM, self).__init__()
+        # the RemoteClientManager plays the roll of a server
+        self._server_message: Optional[RemoteClientManagerMessage] = None
+        # the VirtualClientMangaer plays the roll of a client
+        self._client_message: Optional[VirtualClientManagerMessage] = None
+
+    def request(self, server_message: RemoteClientManagerMessage) -> VirtualClientManagerMessage:
+            """Set server massage and wait for client message."""
+            print("GRPCBridge_VCM.request()")
+            # Set server message and transition to SERVER_MESSAGE_AVAILABLE
+            with self._cv:
+                self._raise_if_closed()
+
+                if self._status != Status.AWAITING_SERVER_MESSAGE:
+                    raise Exception("This should not happen")
+
+                self._server_message = server_message  # Write
+                self._transition(Status.SERVER_MESSAGE_AVAILABLE)
+
+            # Read client message and transition to AWAITING_SERVER_MESSAGE
+            with self._cv:
+                self._cv.wait_for(
+                    lambda: self._status in [Status.CLOSED, Status.CLIENT_MESSAGE_AVAILABLE]
+                )
+
+                self._raise_if_closed()
+                client_message = self._client_message  # Read
+                self._client_message = None  # Reset
+                self._transition(Status.AWAITING_SERVER_MESSAGE)
+
+            if client_message is None:
+                raise Exception("Client message can not be None")
+            return client_message
+
+    def server_message_iterator(self) -> Iterator[RemoteClientManagerMessage]:
+        """Return iterator over server messages."""
+        while not self._is_closed():
+            with self._cv:
+                self._cv.wait_for(
+                    lambda: self._status
+                    in [Status.CLOSED, Status.SERVER_MESSAGE_AVAILABLE]
+                )
+
+                self._raise_if_closed()
+
+                server_message = self._server_message  # Read
+                self._server_message = None  # Reset
+
+                # Transition before yielding as after the yield the execution of this
+                # function is paused and will resume when next is called again.
+                # Also release condition variable by exiting the context
+                self._transition(Status.AWAITING_CLIENT_MESSAGE)
+
+            if server_message is None:
+                raise Exception("Server message can not be None")
+
+            yield server_message
+
+    def set_client_message(self, client_message: VirtualClientManagerMessage) -> None:
         """Set client message for consumption."""
         with self._cv:
             self._raise_if_closed()

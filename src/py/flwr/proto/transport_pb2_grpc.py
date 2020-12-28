@@ -44,3 +44,45 @@ def add_FlowerServiceServicer_to_server(servicer, server):
   generic_handler = grpc.method_handlers_generic_handler(
       'flower.transport.FlowerService', rpc_method_handlers)
   server.add_generic_rpc_handlers((generic_handler,))
+
+
+class FlowerServiceVCMStub(object):
+  # missing associated documentation comment in .proto file
+  pass
+
+  def __init__(self, channel):
+    """Constructor.
+
+    Args:
+      channel: A grpc.Channel.
+    """
+    self.Join = channel.stream_stream(
+        '/flower.transport.FlowerServiceVCM/Join',
+        request_serializer=flwr_dot_proto_dot_transport__pb2.VirtualClientManagerMessage.SerializeToString,
+        response_deserializer=flwr_dot_proto_dot_transport__pb2.RemoteClientManagerMessage.FromString,
+        )
+
+
+class FlowerServiceVCMServicer(object):
+  # missing associated documentation comment in .proto file
+  pass
+
+  def Join(self, request_iterator, context):
+    # missing associated documentation comment in .proto file
+    pass
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+
+def add_FlowerServiceVCMServicer_to_server(servicer, server):
+  rpc_method_handlers = {
+      'Join': grpc.stream_stream_rpc_method_handler(
+          servicer.Join,
+          request_deserializer=flwr_dot_proto_dot_transport__pb2.VirtualClientManagerMessage.FromString,
+          response_serializer=flwr_dot_proto_dot_transport__pb2.RemoteClientManagerMessage.SerializeToString,
+      ),
+  }
+  generic_handler = grpc.method_handlers_generic_handler(
+      'flower.transport.FlowerServiceVCM', rpc_method_handlers)
+  server.add_generic_rpc_handlers((generic_handler,))

@@ -86,3 +86,32 @@ class Disconnect:
     """Disconnect message from client to server."""
 
     reason: str
+
+
+@dataclass
+class GetPoolSizeRes:
+    """GetPoolSize response from virtual client manager."""
+
+    pool_size: int
+
+
+@dataclass
+class WakeUpClientsIns:
+    """WakeUpClients message from RemoteClientManager to VirtualClientManager"""
+
+    cids: str
+
+
+@dataclass
+class WakeUpClientsRes:
+    """VirtualClientManager replying back to RemoteClientManager"""
+
+    reason: str
+
+
+@dataclass
+class IsAvailableRes:
+    """VirtualClientManager replying back to RemoteClientManager indicting
+    if it is still running jobs from previous `wakeup_clients` request."""
+
+    status: bool

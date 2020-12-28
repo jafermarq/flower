@@ -15,9 +15,10 @@
 """Flower main package."""
 
 
-from . import client, server
+from . import client, server, virtualclientmanager
 
 __all__ = [
     "client",
     "server",
+    "virtualclientmanager",
 ]

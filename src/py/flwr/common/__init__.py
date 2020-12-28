@@ -28,6 +28,10 @@ from .typing import Parameters as Parameters
 from .typing import ParametersRes as ParametersRes
 from .typing import Reconnect as Reconnect
 from .typing import Weights as Weights
+from .typing import GetPoolSizeRes as GetPoolSizeRes
+from .typing import WakeUpClientsIns as WakeUpClientsIns
+from .typing import WakeUpClientsRes as WakeUpClientsRes
+from .typing import IsAvailableRes as IsAvailableRes
 
 GRPC_MAX_MESSAGE_LENGTH: int = 536_870_912  # == 512 * 1024 * 1024
 
@@ -46,4 +50,8 @@ __all__ = [
     "Reconnect",
     "Weights",
     "weights_to_parameters",
+    "GetPoolSizeRes",
+    "WakeUpClientsIns",
+    "WakeUpClientsRes",
+    "IsAvailableRes",
 ]

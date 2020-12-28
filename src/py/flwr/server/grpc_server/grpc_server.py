@@ -21,6 +21,7 @@ from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.proto import transport_pb2_grpc
 from flwr.server.client_manager import ClientManager
 from flwr.server.grpc_server import flower_service_servicer as fss
+from flwr.server.grpc_server import flower_service_servicer_vcm as fss_vcm
 
 
 def start_insecure_grpc_server(
@@ -46,6 +47,12 @@ def start_insecure_grpc_server(
 
     servicer = fss.FlowerServiceServicer(client_manager)
     transport_pb2_grpc.add_FlowerServiceServicer_to_server(  # type: ignore
+        servicer, server
+    )
+
+    # Service RemoteClientManager <--> VirtualClientManager
+    servicer = fss_vcm.FlowerServiceServicerVCM(client_manager)
+    transport_pb2_grpc.add_FlowerServiceVCMServicer_to_server(  # type: ignore
         servicer, server
     )
 

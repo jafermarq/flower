@@ -12,19 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Flower Server."""
+"""Flower Virtual Client Manager."""
 
 
-from .app import start_server as start_server
-from .client_manager import SimpleClientManager as SimpleClientManager
-from .client_manager import RemoteClientManager as RemoteClientManager
-from .history import History as History
-from .server import Server as Server
+from .app import start_virtual_client_manager as start_virtual_client_manager
+from .virtualclientmanager import VirtualClientManager as VirtualClientManager
 
 __all__ = [
-    "start_server",
-    "SimpleClientManager",
-    "RemoteClientManager",
-    "History",
-    "Server",
+    "start_virtual_client_manager",
+    "VirtualClientManager",
 ]

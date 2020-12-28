@@ -18,7 +18,7 @@ deserialization."""
 
 from typing import List
 
-from flwr.proto.transport_pb2 import ClientMessage, Parameters, Reason, ServerMessage
+from flwr.proto.transport_pb2 import ClientMessage, Parameters, Reason, ServerMessage, VirtualClientManagerMessage, RemoteClientManagerMessage
 
 from . import typing
 
@@ -165,3 +165,58 @@ def evaluate_res_from_proto(msg: ClientMessage.EvaluateRes) -> typing.EvaluateRe
     return typing.EvaluateRes(
         num_examples=msg.num_examples, loss=msg.loss, accuracy=msg.accuracy
     )
+
+
+# === GetPoolSize messages ===
+
+def get_pool_size_to_proto() -> RemoteClientManagerMessage.GetPoolSize:
+    """."""
+    return RemoteClientManagerMessage.GetPoolSize()
+
+
+def get_pool_size_res_to_proto(res: typing.GetPoolSizeRes) -> VirtualClientManagerMessage.GetPoolSizeRes:
+
+    print(f"serde.get_pool_size_res_to_proto -> res: {res}")
+    return VirtualClientManagerMessage.GetPoolSizeRes(pool_size=res)
+
+
+def get_pool_size_res_from_proto(msg: VirtualClientManagerMessage.GetPoolSizeRes) -> typing.GetPoolSizeRes:
+    print(f"get_pool_size_res_from_proto: {msg}")
+    poolsize = msg.pool_size
+    return typing.GetPoolSizeRes(pool_size=poolsize)
+
+
+# === WakeUpClients messages ===
+
+def wakeup_clients_to_proto(msg: typing.WakeUpClientsIns) -> RemoteClientManagerMessage.WakeUpClients:
+    return RemoteClientManagerMessage.WakeUpClients(cids=msg.cids)
+
+
+def wakeup_clients_from_proto(msg: RemoteClientManagerMessage.WakeUpClients) -> typing.WakeUpClientsIns:
+    print(f"serde.wakeup_clients_from_proto() -->  obtained: {msg}")
+    return typing.WakeUpClientsIns(cids=msg.cids)
+
+
+def wakeup_clients_res_to_proto(res: typing.WakeUpClientsRes) -> VirtualClientManagerMessage.WakeUpClientsRes:
+    print(f"serde.wakeup_clients_res_to_proto() -->  res: {res}")
+    return VirtualClientManagerMessage.WakeUpClientsRes(reason=res)
+
+
+def wakeup_clients_res_from_proto(msg: VirtualClientManagerMessage.WakeUpClientsRes) -> typing.WakeUpClientsRes:
+    print(f"serde.wakeup_clients_res_from_proto() -> msg: {msg}")
+    return typing.WakeUpClientsRes(reason=msg.reason)
+
+
+# === IsAvailable (VCM) messages ===
+
+def is_available_to_proto() -> RemoteClientManagerMessage.IsAvailable:
+    return RemoteClientManagerMessage.IsAvailable()
+
+
+def is_available_res_to_proto(res: typing.IsAvailableRes) -> VirtualClientManagerMessage.IsAvailableRes:
+    return VirtualClientManagerMessage.IsAvailableRes(available=res.status)
+
+
+def is_available_res_from_proto(msg: VirtualClientManagerMessage.IsAvailableRes) -> typing.IsAvailableRes:
+    status = msg.available
+    return typing.IsAvailableRes(status=status)

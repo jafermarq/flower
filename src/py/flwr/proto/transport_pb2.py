@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='flower.transport',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=b'\n\x1a\x66lwr/proto/transport.proto\x12\x10\x66lower.transport\"2\n\nParameters\x12\x0f\n\x07tensors\x18\x01 \x03(\x0c\x12\x13\n\x0btensor_type\x18\x02 \x01(\t\"\xb8\x05\n\rServerMessage\x12>\n\treconnect\x18\x01 \x01(\x0b\x32).flower.transport.ServerMessage.ReconnectH\x00\x12G\n\x0eget_parameters\x18\x02 \x01(\x0b\x32-.flower.transport.ServerMessage.GetParametersH\x00\x12\x39\n\x07\x66it_ins\x18\x03 \x01(\x0b\x32&.flower.transport.ServerMessage.FitInsH\x00\x12\x43\n\x0c\x65valuate_ins\x18\x04 \x01(\x0b\x32+.flower.transport.ServerMessage.EvaluateInsH\x00\x1a\x1c\n\tReconnect\x12\x0f\n\x07seconds\x18\x01 \x01(\x03\x1a\x0f\n\rGetParameters\x1a\xad\x01\n\x06\x46itIns\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12\x42\n\x06\x63onfig\x18\x02 \x03(\x0b\x32\x32.flower.transport.ServerMessage.FitIns.ConfigEntry\x1a-\n\x0b\x43onfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\xb7\x01\n\x0b\x45valuateIns\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12G\n\x06\x63onfig\x18\x02 \x03(\x0b\x32\x37.flower.transport.ServerMessage.EvaluateIns.ConfigEntry\x1a-\n\x0b\x43onfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x05\n\x03msg\"\xe5\x04\n\rClientMessage\x12@\n\ndisconnect\x18\x01 \x01(\x0b\x32*.flower.transport.ClientMessage.DisconnectH\x00\x12G\n\x0eparameters_res\x18\x02 \x01(\x0b\x32-.flower.transport.ClientMessage.ParametersResH\x00\x12\x39\n\x07\x66it_res\x18\x03 \x01(\x0b\x32&.flower.transport.ClientMessage.FitResH\x00\x12\x43\n\x0c\x65valuate_res\x18\x04 \x01(\x0b\x32+.flower.transport.ClientMessage.EvaluateResH\x00\x1a\x36\n\nDisconnect\x12(\n\x06reason\x18\x01 \x01(\x0e\x32\x18.flower.transport.Reason\x1a\x41\n\rParametersRes\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x1a\x81\x01\n\x06\x46itRes\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12\x14\n\x0cnum_examples\x18\x02 \x01(\x03\x12\x19\n\x11num_examples_ceil\x18\x03 \x01(\x03\x12\x14\n\x0c\x66it_duration\x18\x04 \x01(\x02\x1a\x43\n\x0b\x45valuateRes\x12\x14\n\x0cnum_examples\x18\x01 \x01(\x03\x12\x0c\n\x04loss\x18\x02 \x01(\x02\x12\x10\n\x08\x61\x63\x63uracy\x18\x03 \x01(\x02\x42\x05\n\x03msg*[\n\x06Reason\x12\x0b\n\x07UNKNOWN\x10\x00\x12\r\n\tRECONNECT\x10\x01\x12\x16\n\x12POWER_DISCONNECTED\x10\x02\x12\x14\n\x10WIFI_UNAVAILABLE\x10\x03\x12\x07\n\x03\x41\x43K\x10\x04\x32_\n\rFlowerService\x12N\n\x04Join\x12\x1f.flower.transport.ClientMessage\x1a\x1f.flower.transport.ServerMessage\"\x00(\x01\x30\x01\x62\x06proto3'
+  serialized_pb=b'\n\x1a\x66lwr/proto/transport.proto\x12\x10\x66lower.transport\"2\n\nParameters\x12\x0f\n\x07tensors\x18\x01 \x03(\x0c\x12\x13\n\x0btensor_type\x18\x02 \x01(\t\"\xb8\x05\n\rServerMessage\x12>\n\treconnect\x18\x01 \x01(\x0b\x32).flower.transport.ServerMessage.ReconnectH\x00\x12G\n\x0eget_parameters\x18\x02 \x01(\x0b\x32-.flower.transport.ServerMessage.GetParametersH\x00\x12\x39\n\x07\x66it_ins\x18\x03 \x01(\x0b\x32&.flower.transport.ServerMessage.FitInsH\x00\x12\x43\n\x0c\x65valuate_ins\x18\x04 \x01(\x0b\x32+.flower.transport.ServerMessage.EvaluateInsH\x00\x1a\x1c\n\tReconnect\x12\x0f\n\x07seconds\x18\x01 \x01(\x03\x1a\x0f\n\rGetParameters\x1a\xad\x01\n\x06\x46itIns\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12\x42\n\x06\x63onfig\x18\x02 \x03(\x0b\x32\x32.flower.transport.ServerMessage.FitIns.ConfigEntry\x1a-\n\x0b\x43onfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\xb7\x01\n\x0b\x45valuateIns\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12G\n\x06\x63onfig\x18\x02 \x03(\x0b\x32\x37.flower.transport.ServerMessage.EvaluateIns.ConfigEntry\x1a-\n\x0b\x43onfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x05\n\x03msg\"\xe5\x04\n\rClientMessage\x12@\n\ndisconnect\x18\x01 \x01(\x0b\x32*.flower.transport.ClientMessage.DisconnectH\x00\x12G\n\x0eparameters_res\x18\x02 \x01(\x0b\x32-.flower.transport.ClientMessage.ParametersResH\x00\x12\x39\n\x07\x66it_res\x18\x03 \x01(\x0b\x32&.flower.transport.ClientMessage.FitResH\x00\x12\x43\n\x0c\x65valuate_res\x18\x04 \x01(\x0b\x32+.flower.transport.ClientMessage.EvaluateResH\x00\x1a\x36\n\nDisconnect\x12(\n\x06reason\x18\x01 \x01(\x0e\x32\x18.flower.transport.Reason\x1a\x41\n\rParametersRes\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x1a\x81\x01\n\x06\x46itRes\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12\x14\n\x0cnum_examples\x18\x02 \x01(\x03\x12\x19\n\x11num_examples_ceil\x18\x03 \x01(\x03\x12\x14\n\x0c\x66it_duration\x18\x04 \x01(\x02\x1a\x43\n\x0b\x45valuateRes\x12\x14\n\x0cnum_examples\x18\x01 \x01(\x03\x12\x0c\n\x04loss\x18\x02 \x01(\x02\x12\x10\n\x08\x61\x63\x63uracy\x18\x03 \x01(\x02\x42\x05\n\x03msg\"\xbf\x03\n\x1bVirtualClientManagerMessage\x12Y\n\x11get_pool_size_res\x18\x01 \x01(\x0b\x32<.flower.transport.VirtualClientManagerMessage.GetPoolSizeResH\x00\x12\\\n\x12wakeup_clients_res\x18\x02 \x01(\x0b\x32>.flower.transport.VirtualClientManagerMessage.WakeUpClientsResH\x00\x12X\n\x10is_available_res\x18\x03 \x01(\x0b\x32<.flower.transport.VirtualClientManagerMessage.IsAvailableResH\x00\x1a#\n\x0eGetPoolSizeRes\x12\x11\n\tpool_size\x18\x01 \x01(\x05\x1a<\n\x10WakeUpClientsRes\x12(\n\x06reason\x18\x01 \x01(\x0e\x32\x18.flower.transport.Reason\x1a#\n\x0eIsAvailableRes\x12\x11\n\tavailable\x18\x01 \x01(\x08\x42\x05\n\x03msg\"\xdb\x02\n\x1aRemoteClientManagerMessage\x12Q\n\rget_pool_size\x18\x01 \x01(\x0b\x32\x38.flower.transport.RemoteClientManagerMessage.GetPoolSizeH\x00\x12T\n\x0ewakeup_clients\x18\x02 \x01(\x0b\x32:.flower.transport.RemoteClientManagerMessage.WakeUpClientsH\x00\x12P\n\x0cis_available\x18\x03 \x01(\x0b\x32\x38.flower.transport.RemoteClientManagerMessage.IsAvailableH\x00\x1a\r\n\x0bGetPoolSize\x1a\x1d\n\rWakeUpClients\x12\x0c\n\x04\x63ids\x18\x01 \x01(\t\x1a\r\n\x0bIsAvailableB\x05\n\x03msg*[\n\x06Reason\x12\x0b\n\x07UNKNOWN\x10\x00\x12\r\n\tRECONNECT\x10\x01\x12\x16\n\x12POWER_DISCONNECTED\x10\x02\x12\x14\n\x10WIFI_UNAVAILABLE\x10\x03\x12\x07\n\x03\x41\x43K\x10\x04\x32_\n\rFlowerService\x12N\n\x04Join\x12\x1f.flower.transport.ClientMessage\x1a\x1f.flower.transport.ServerMessage\"\x00(\x01\x30\x01\x32}\n\x10\x46lowerServiceVCM\x12i\n\x04Join\x12-.flower.transport.VirtualClientManagerMessage\x1a,.flower.transport.RemoteClientManagerMessage\"\x00(\x01\x30\x01\x62\x06proto3'
 )
 
 _REASON = _descriptor.EnumDescriptor(
@@ -51,8 +51,8 @@ _REASON = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1415,
-  serialized_end=1506,
+  serialized_start=2215,
+  serialized_end=2306,
 )
 _sym_db.RegisterEnumDescriptor(_REASON)
 
@@ -568,6 +568,268 @@ _CLIENTMESSAGE = _descriptor.Descriptor(
   serialized_end=1413,
 )
 
+
+_VIRTUALCLIENTMANAGERMESSAGE_GETPOOLSIZERES = _descriptor.Descriptor(
+  name='GetPoolSizeRes',
+  full_name='flower.transport.VirtualClientManagerMessage.GetPoolSizeRes',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='pool_size', full_name='flower.transport.VirtualClientManagerMessage.GetPoolSizeRes.pool_size', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1722,
+  serialized_end=1757,
+)
+
+_VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES = _descriptor.Descriptor(
+  name='WakeUpClientsRes',
+  full_name='flower.transport.VirtualClientManagerMessage.WakeUpClientsRes',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='reason', full_name='flower.transport.VirtualClientManagerMessage.WakeUpClientsRes.reason', index=0,
+      number=1, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1759,
+  serialized_end=1819,
+)
+
+_VIRTUALCLIENTMANAGERMESSAGE_ISAVAILABLERES = _descriptor.Descriptor(
+  name='IsAvailableRes',
+  full_name='flower.transport.VirtualClientManagerMessage.IsAvailableRes',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='available', full_name='flower.transport.VirtualClientManagerMessage.IsAvailableRes.available', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1821,
+  serialized_end=1856,
+)
+
+_VIRTUALCLIENTMANAGERMESSAGE = _descriptor.Descriptor(
+  name='VirtualClientManagerMessage',
+  full_name='flower.transport.VirtualClientManagerMessage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='get_pool_size_res', full_name='flower.transport.VirtualClientManagerMessage.get_pool_size_res', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='wakeup_clients_res', full_name='flower.transport.VirtualClientManagerMessage.wakeup_clients_res', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='is_available_res', full_name='flower.transport.VirtualClientManagerMessage.is_available_res', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[_VIRTUALCLIENTMANAGERMESSAGE_GETPOOLSIZERES, _VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES, _VIRTUALCLIENTMANAGERMESSAGE_ISAVAILABLERES, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='msg', full_name='flower.transport.VirtualClientManagerMessage.msg',
+      index=0, containing_type=None, fields=[]),
+  ],
+  serialized_start=1416,
+  serialized_end=1863,
+)
+
+
+_REMOTECLIENTMANAGERMESSAGE_GETPOOLSIZE = _descriptor.Descriptor(
+  name='GetPoolSize',
+  full_name='flower.transport.RemoteClientManagerMessage.GetPoolSize',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2147,
+  serialized_end=2160,
+)
+
+_REMOTECLIENTMANAGERMESSAGE_WAKEUPCLIENTS = _descriptor.Descriptor(
+  name='WakeUpClients',
+  full_name='flower.transport.RemoteClientManagerMessage.WakeUpClients',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='cids', full_name='flower.transport.RemoteClientManagerMessage.WakeUpClients.cids', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2162,
+  serialized_end=2191,
+)
+
+_REMOTECLIENTMANAGERMESSAGE_ISAVAILABLE = _descriptor.Descriptor(
+  name='IsAvailable',
+  full_name='flower.transport.RemoteClientManagerMessage.IsAvailable',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2193,
+  serialized_end=2206,
+)
+
+_REMOTECLIENTMANAGERMESSAGE = _descriptor.Descriptor(
+  name='RemoteClientManagerMessage',
+  full_name='flower.transport.RemoteClientManagerMessage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='get_pool_size', full_name='flower.transport.RemoteClientManagerMessage.get_pool_size', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='wakeup_clients', full_name='flower.transport.RemoteClientManagerMessage.wakeup_clients', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='is_available', full_name='flower.transport.RemoteClientManagerMessage.is_available', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+  ],
+  extensions=[
+  ],
+  nested_types=[_REMOTECLIENTMANAGERMESSAGE_GETPOOLSIZE, _REMOTECLIENTMANAGERMESSAGE_WAKEUPCLIENTS, _REMOTECLIENTMANAGERMESSAGE_ISAVAILABLE, ],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+    _descriptor.OneofDescriptor(
+      name='msg', full_name='flower.transport.RemoteClientManagerMessage.msg',
+      index=0, containing_type=None, fields=[]),
+  ],
+  serialized_start=1866,
+  serialized_end=2213,
+)
+
 _SERVERMESSAGE_RECONNECT.containing_type = _SERVERMESSAGE
 _SERVERMESSAGE_GETPARAMETERS.containing_type = _SERVERMESSAGE
 _SERVERMESSAGE_FITINS_CONFIGENTRY.containing_type = _SERVERMESSAGE_FITINS
@@ -617,9 +879,42 @@ _CLIENTMESSAGE.fields_by_name['fit_res'].containing_oneof = _CLIENTMESSAGE.oneof
 _CLIENTMESSAGE.oneofs_by_name['msg'].fields.append(
   _CLIENTMESSAGE.fields_by_name['evaluate_res'])
 _CLIENTMESSAGE.fields_by_name['evaluate_res'].containing_oneof = _CLIENTMESSAGE.oneofs_by_name['msg']
+_VIRTUALCLIENTMANAGERMESSAGE_GETPOOLSIZERES.containing_type = _VIRTUALCLIENTMANAGERMESSAGE
+_VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES.fields_by_name['reason'].enum_type = _REASON
+_VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES.containing_type = _VIRTUALCLIENTMANAGERMESSAGE
+_VIRTUALCLIENTMANAGERMESSAGE_ISAVAILABLERES.containing_type = _VIRTUALCLIENTMANAGERMESSAGE
+_VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['get_pool_size_res'].message_type = _VIRTUALCLIENTMANAGERMESSAGE_GETPOOLSIZERES
+_VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['wakeup_clients_res'].message_type = _VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES
+_VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['is_available_res'].message_type = _VIRTUALCLIENTMANAGERMESSAGE_ISAVAILABLERES
+_VIRTUALCLIENTMANAGERMESSAGE.oneofs_by_name['msg'].fields.append(
+  _VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['get_pool_size_res'])
+_VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['get_pool_size_res'].containing_oneof = _VIRTUALCLIENTMANAGERMESSAGE.oneofs_by_name['msg']
+_VIRTUALCLIENTMANAGERMESSAGE.oneofs_by_name['msg'].fields.append(
+  _VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['wakeup_clients_res'])
+_VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['wakeup_clients_res'].containing_oneof = _VIRTUALCLIENTMANAGERMESSAGE.oneofs_by_name['msg']
+_VIRTUALCLIENTMANAGERMESSAGE.oneofs_by_name['msg'].fields.append(
+  _VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['is_available_res'])
+_VIRTUALCLIENTMANAGERMESSAGE.fields_by_name['is_available_res'].containing_oneof = _VIRTUALCLIENTMANAGERMESSAGE.oneofs_by_name['msg']
+_REMOTECLIENTMANAGERMESSAGE_GETPOOLSIZE.containing_type = _REMOTECLIENTMANAGERMESSAGE
+_REMOTECLIENTMANAGERMESSAGE_WAKEUPCLIENTS.containing_type = _REMOTECLIENTMANAGERMESSAGE
+_REMOTECLIENTMANAGERMESSAGE_ISAVAILABLE.containing_type = _REMOTECLIENTMANAGERMESSAGE
+_REMOTECLIENTMANAGERMESSAGE.fields_by_name['get_pool_size'].message_type = _REMOTECLIENTMANAGERMESSAGE_GETPOOLSIZE
+_REMOTECLIENTMANAGERMESSAGE.fields_by_name['wakeup_clients'].message_type = _REMOTECLIENTMANAGERMESSAGE_WAKEUPCLIENTS
+_REMOTECLIENTMANAGERMESSAGE.fields_by_name['is_available'].message_type = _REMOTECLIENTMANAGERMESSAGE_ISAVAILABLE
+_REMOTECLIENTMANAGERMESSAGE.oneofs_by_name['msg'].fields.append(
+  _REMOTECLIENTMANAGERMESSAGE.fields_by_name['get_pool_size'])
+_REMOTECLIENTMANAGERMESSAGE.fields_by_name['get_pool_size'].containing_oneof = _REMOTECLIENTMANAGERMESSAGE.oneofs_by_name['msg']
+_REMOTECLIENTMANAGERMESSAGE.oneofs_by_name['msg'].fields.append(
+  _REMOTECLIENTMANAGERMESSAGE.fields_by_name['wakeup_clients'])
+_REMOTECLIENTMANAGERMESSAGE.fields_by_name['wakeup_clients'].containing_oneof = _REMOTECLIENTMANAGERMESSAGE.oneofs_by_name['msg']
+_REMOTECLIENTMANAGERMESSAGE.oneofs_by_name['msg'].fields.append(
+  _REMOTECLIENTMANAGERMESSAGE.fields_by_name['is_available'])
+_REMOTECLIENTMANAGERMESSAGE.fields_by_name['is_available'].containing_oneof = _REMOTECLIENTMANAGERMESSAGE.oneofs_by_name['msg']
 DESCRIPTOR.message_types_by_name['Parameters'] = _PARAMETERS
 DESCRIPTOR.message_types_by_name['ServerMessage'] = _SERVERMESSAGE
 DESCRIPTOR.message_types_by_name['ClientMessage'] = _CLIENTMESSAGE
+DESCRIPTOR.message_types_by_name['VirtualClientManagerMessage'] = _VIRTUALCLIENTMANAGERMESSAGE
+DESCRIPTOR.message_types_by_name['RemoteClientManagerMessage'] = _REMOTECLIENTMANAGERMESSAGE
 DESCRIPTOR.enum_types_by_name['Reason'] = _REASON
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -724,6 +1019,68 @@ _sym_db.RegisterMessage(ClientMessage.ParametersRes)
 _sym_db.RegisterMessage(ClientMessage.FitRes)
 _sym_db.RegisterMessage(ClientMessage.EvaluateRes)
 
+VirtualClientManagerMessage = _reflection.GeneratedProtocolMessageType('VirtualClientManagerMessage', (_message.Message,), {
+
+  'GetPoolSizeRes' : _reflection.GeneratedProtocolMessageType('GetPoolSizeRes', (_message.Message,), {
+    'DESCRIPTOR' : _VIRTUALCLIENTMANAGERMESSAGE_GETPOOLSIZERES,
+    '__module__' : 'flwr.proto.transport_pb2'
+    # @@protoc_insertion_point(class_scope:flower.transport.VirtualClientManagerMessage.GetPoolSizeRes)
+    })
+  ,
+
+  'WakeUpClientsRes' : _reflection.GeneratedProtocolMessageType('WakeUpClientsRes', (_message.Message,), {
+    'DESCRIPTOR' : _VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES,
+    '__module__' : 'flwr.proto.transport_pb2'
+    # @@protoc_insertion_point(class_scope:flower.transport.VirtualClientManagerMessage.WakeUpClientsRes)
+    })
+  ,
+
+  'IsAvailableRes' : _reflection.GeneratedProtocolMessageType('IsAvailableRes', (_message.Message,), {
+    'DESCRIPTOR' : _VIRTUALCLIENTMANAGERMESSAGE_ISAVAILABLERES,
+    '__module__' : 'flwr.proto.transport_pb2'
+    # @@protoc_insertion_point(class_scope:flower.transport.VirtualClientManagerMessage.IsAvailableRes)
+    })
+  ,
+  'DESCRIPTOR' : _VIRTUALCLIENTMANAGERMESSAGE,
+  '__module__' : 'flwr.proto.transport_pb2'
+  # @@protoc_insertion_point(class_scope:flower.transport.VirtualClientManagerMessage)
+  })
+_sym_db.RegisterMessage(VirtualClientManagerMessage)
+_sym_db.RegisterMessage(VirtualClientManagerMessage.GetPoolSizeRes)
+_sym_db.RegisterMessage(VirtualClientManagerMessage.WakeUpClientsRes)
+_sym_db.RegisterMessage(VirtualClientManagerMessage.IsAvailableRes)
+
+RemoteClientManagerMessage = _reflection.GeneratedProtocolMessageType('RemoteClientManagerMessage', (_message.Message,), {
+
+  'GetPoolSize' : _reflection.GeneratedProtocolMessageType('GetPoolSize', (_message.Message,), {
+    'DESCRIPTOR' : _REMOTECLIENTMANAGERMESSAGE_GETPOOLSIZE,
+    '__module__' : 'flwr.proto.transport_pb2'
+    # @@protoc_insertion_point(class_scope:flower.transport.RemoteClientManagerMessage.GetPoolSize)
+    })
+  ,
+
+  'WakeUpClients' : _reflection.GeneratedProtocolMessageType('WakeUpClients', (_message.Message,), {
+    'DESCRIPTOR' : _REMOTECLIENTMANAGERMESSAGE_WAKEUPCLIENTS,
+    '__module__' : 'flwr.proto.transport_pb2'
+    # @@protoc_insertion_point(class_scope:flower.transport.RemoteClientManagerMessage.WakeUpClients)
+    })
+  ,
+
+  'IsAvailable' : _reflection.GeneratedProtocolMessageType('IsAvailable', (_message.Message,), {
+    'DESCRIPTOR' : _REMOTECLIENTMANAGERMESSAGE_ISAVAILABLE,
+    '__module__' : 'flwr.proto.transport_pb2'
+    # @@protoc_insertion_point(class_scope:flower.transport.RemoteClientManagerMessage.IsAvailable)
+    })
+  ,
+  'DESCRIPTOR' : _REMOTECLIENTMANAGERMESSAGE,
+  '__module__' : 'flwr.proto.transport_pb2'
+  # @@protoc_insertion_point(class_scope:flower.transport.RemoteClientManagerMessage)
+  })
+_sym_db.RegisterMessage(RemoteClientManagerMessage)
+_sym_db.RegisterMessage(RemoteClientManagerMessage.GetPoolSize)
+_sym_db.RegisterMessage(RemoteClientManagerMessage.WakeUpClients)
+_sym_db.RegisterMessage(RemoteClientManagerMessage.IsAvailable)
+
 
 _SERVERMESSAGE_FITINS_CONFIGENTRY._options = None
 _SERVERMESSAGE_EVALUATEINS_CONFIGENTRY._options = None
@@ -734,8 +1091,8 @@ _FLOWERSERVICE = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=1508,
-  serialized_end=1603,
+  serialized_start=2308,
+  serialized_end=2403,
   methods=[
   _descriptor.MethodDescriptor(
     name='Join',
@@ -750,5 +1107,29 @@ _FLOWERSERVICE = _descriptor.ServiceDescriptor(
 _sym_db.RegisterServiceDescriptor(_FLOWERSERVICE)
 
 DESCRIPTOR.services_by_name['FlowerService'] = _FLOWERSERVICE
+
+
+_FLOWERSERVICEVCM = _descriptor.ServiceDescriptor(
+  name='FlowerServiceVCM',
+  full_name='flower.transport.FlowerServiceVCM',
+  file=DESCRIPTOR,
+  index=1,
+  serialized_options=None,
+  serialized_start=2405,
+  serialized_end=2530,
+  methods=[
+  _descriptor.MethodDescriptor(
+    name='Join',
+    full_name='flower.transport.FlowerServiceVCM.Join',
+    index=0,
+    containing_service=None,
+    input_type=_VIRTUALCLIENTMANAGERMESSAGE,
+    output_type=_REMOTECLIENTMANAGERMESSAGE,
+    serialized_options=None,
+  ),
+])
+_sym_db.RegisterServiceDescriptor(_FLOWERSERVICEVCM)
+
+DESCRIPTOR.services_by_name['FlowerServiceVCM'] = _FLOWERSERVICEVCM
 
 # @@protoc_insertion_point(module_scope)
