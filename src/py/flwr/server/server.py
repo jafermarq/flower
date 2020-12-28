@@ -167,7 +167,7 @@ class Server:
         if isinstance(self._client_manager, RemoteClientManager):
             results = []
             failures = []
-            with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
+            with tqdm(total=self.strategy.min_fit_clients+1 if rnd==1 else self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
                 while len(results) < self.strategy.min_fit_clients:
 
                     # Get clients and their respective instructions from strategy
@@ -194,7 +194,8 @@ class Server:
                     # shut down clients
                     all_clients = self._client_manager.all()
                     _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
-
+                    # TODO: this behaves oddly in the first round (since atm we fit num_clients + 1) causing the progress bar to exceed its limit
+                    # TODO: Once the above is corrected, update `with tqdm` line to avoid if/else. Both TODOs have really no impact whatsoever
                     t.set_postfix({'results': f"{len(results)}", 'failures':f"{len(failures)}"})
                     t.update(len(results_))
         else:

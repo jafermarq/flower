@@ -249,7 +249,11 @@ class RemoteClientManager(SimpleClientManager):
             self.wakeup_clients(cids)
 
         # Block until connected
-        # print("Waiting for clients launched by VCM to connect")
+        # with a VCM we'll always exhaust the waiting time, therefore
+        # the timeout in self.wait_for should be a low number (3-10s)
+        # for very short on-client training pipelines, this timer might
+        # become a bottleneck in the whole FL pipeline.
+        # TODO: avoid using a timer and instead wait until the VCM sends a message saying that no more clients can't be allocated use that signal to continue
         self.wait_for(min_num_clients)
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
