@@ -59,7 +59,7 @@ def start_virtual_client_manager(
 
             while True:
                 server_message = receive()
-                print("VCM received a message.. passing to handler...")
+                # print("VCM received a message.. passing to handler...")
                 print(f"server_message: {server_message}")
                 vcm_message, sleep_duration, keep_going = handle(
                     virtual_client_manager, server_message

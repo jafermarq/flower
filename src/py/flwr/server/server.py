@@ -32,7 +32,7 @@ from flwr.common import (
     parameters_to_weights,
 )
 from flwr.common.logger import log
-from flwr.server.client_manager import ClientManager
+from flwr.server.client_manager import ClientManager, RemoteClientManager
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.history import History
 from flwr.server.strategy import FedAvg, Strategy
@@ -57,12 +57,10 @@ class Server:
     def __init__(
         self, client_manager: ClientManager,
         strategy: Optional[Strategy] = None,
-        virtual_client_pool: bool = False
     ) -> None:
         self._client_manager: ClientManager = client_manager
         self.weights: Weights = []
         self.strategy: Strategy = set_strategy(strategy)
-        self.virtual_client_pool = virtual_client_pool
 
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
@@ -161,7 +159,7 @@ class Server:
     def fit_round(self, rnd: int) -> Optional[Weights]:
         """Perform a single round of federated averaging."""
         # ! this can certainly be done in a nicer way...
-        if self.virtual_client_pool:
+        if isinstance(self._client_manager, RemoteClientManager):
             results = []
             failures = []
             with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
@@ -192,7 +190,6 @@ class Server:
                     all_clients = self._client_manager.all()
                     _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
 
-                    # print(f"fit_round() {len(results)}/{self.strategy.min_fit_clients}")
                     t.set_postfix({'results': f"{len(results)}", 'failures':f"{len(failures)}"})
                     t.update(len(results_))
         else:

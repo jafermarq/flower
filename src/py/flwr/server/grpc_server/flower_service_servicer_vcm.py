@@ -20,12 +20,11 @@ Relevant knowledge for reading this modules code:
 from typing import Callable, Iterator
 
 import grpc
-import time
+# import time
 
 from flwr.proto import transport_pb2_grpc
 from flwr.proto.transport_pb2 import VirtualClientManagerMessage, RemoteClientManagerMessage
 from flwr.server.client_manager import RemoteClientManager
-from flwr.virtualclientmanager.virtualclientmanager import VirtualClientManager
 from flwr.server.grpc_server.grpc_bridge import GRPCBridge_VCM
 from flwr.server.grpc_server.grpc_virtual_client_manager_proxy import GrpcVirtualClientManagerProxy
 
@@ -105,19 +104,19 @@ class FlowerServiceServicerVCM(transport_pb2_grpc.FlowerServiceVCMServicer):
             # Get iterators
             client_message_iterator = request_iterator
             server_message_iterator = bridge.server_message_iterator()
-            print("Obtained iterators")
+            # print("Obtained iterators")
             # All messages will be pushed to client bridge directly
             while True:
                 try:
                     # Get server message from bridge and yield it
                     server_message = next(server_message_iterator)
-                    print(f"server_message: {server_message}")
-                    print("sleeping for 3 seconds")
-                    time.sleep(3)
+                    # print(f"server_message: {server_message}")
+                    # print("sleeping for 3 seconds")
+                    # time.sleep(3)
                     yield server_message
                     # Wait for client message
                     client_message = next(client_message_iterator)
-                    print(f"obtained client_message: {client_message}")
+                    # print(f"obtained client_message: {client_message}")
                     bridge.set_client_message(client_message)
                 except StopIteration:
                     break

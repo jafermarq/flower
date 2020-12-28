@@ -182,7 +182,7 @@ class GRPCBridge_VCM(GRPCBridge):
 
     def request(self, server_message: RemoteClientManagerMessage) -> VirtualClientManagerMessage:
             """Set server massage and wait for client message."""
-            print("GRPCBridge_VCM.request()")
+            # print("GRPCBridge_VCM.request()")
             # Set server message and transition to SERVER_MESSAGE_AVAILABLE
             with self._cv:
                 self._raise_if_closed()

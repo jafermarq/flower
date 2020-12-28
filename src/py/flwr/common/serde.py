@@ -176,12 +176,12 @@ def get_pool_size_to_proto() -> RemoteClientManagerMessage.GetPoolSize:
 
 def get_pool_size_res_to_proto(res: typing.GetPoolSizeRes) -> VirtualClientManagerMessage.GetPoolSizeRes:
 
-    print(f"serde.get_pool_size_res_to_proto -> res: {res}")
+    # print(f"serde.get_pool_size_res_to_proto -> res: {res}")
     return VirtualClientManagerMessage.GetPoolSizeRes(pool_size=res)
 
 
 def get_pool_size_res_from_proto(msg: VirtualClientManagerMessage.GetPoolSizeRes) -> typing.GetPoolSizeRes:
-    print(f"get_pool_size_res_from_proto: {msg}")
+    # print(f"get_pool_size_res_from_proto: {msg}")
     poolsize = msg.pool_size
     return typing.GetPoolSizeRes(pool_size=poolsize)
 
@@ -193,17 +193,17 @@ def wakeup_clients_to_proto(msg: typing.WakeUpClientsIns) -> RemoteClientManager
 
 
 def wakeup_clients_from_proto(msg: RemoteClientManagerMessage.WakeUpClients) -> typing.WakeUpClientsIns:
-    print(f"serde.wakeup_clients_from_proto() -->  obtained: {msg}")
+    # print(f"serde.wakeup_clients_from_proto() -->  obtained: {msg}")
     return typing.WakeUpClientsIns(cids=msg.cids)
 
 
 def wakeup_clients_res_to_proto(res: typing.WakeUpClientsRes) -> VirtualClientManagerMessage.WakeUpClientsRes:
-    print(f"serde.wakeup_clients_res_to_proto() -->  res: {res}")
+    # print(f"serde.wakeup_clients_res_to_proto() -->  res: {res}")
     return VirtualClientManagerMessage.WakeUpClientsRes(reason=res)
 
 
 def wakeup_clients_res_from_proto(msg: VirtualClientManagerMessage.WakeUpClientsRes) -> typing.WakeUpClientsRes:
-    print(f"serde.wakeup_clients_res_from_proto() -> msg: {msg}")
+    # print(f"serde.wakeup_clients_res_from_proto() -> msg: {msg}")
     return typing.WakeUpClientsRes(reason=msg.reason)
 
 

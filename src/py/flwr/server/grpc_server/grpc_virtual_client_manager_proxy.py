@@ -44,7 +44,7 @@ class GrpcVirtualClientManagerProxy(VirtualClientManagerProxy):
 
     def wakeup_clients(self, ins: common.WakeUpClientsIns) -> common.WakeUpClientsRes:
         """Tells which clients in the virtual pool to instantiate."""
-        print("GrpcVirtualClientManagerProxy.wakeup_clients()")
+        # print("GrpcVirtualClientManagerProxy.wakeup_clients()")
         wakup_clients_msg = serde.wakeup_clients_to_proto(ins)
         vcm_msg: VirtualClientManagerMessage = self.bridge.request(
             RemoteClientManagerMessage(wakeup_clients=wakup_clients_msg)
@@ -54,7 +54,7 @@ class GrpcVirtualClientManagerProxy(VirtualClientManagerProxy):
         return wakeup_clients_res
 
     def is_available(self) -> common.IsAvailableRes:
-        print("GrpcVirtualClientManagerProxy.is_available()")
+        # print("GrpcVirtualClientManagerProxy.is_available()")
         is_available_msg = serde.is_available_to_proto()
 
         vcm_msg: VirtualClientManagerMessage = self.bridge.request(

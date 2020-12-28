@@ -31,7 +31,7 @@ class UnkownRemoteClientManagerMessage(Exception):
 def handle(
     vcm: VirtualClientManager, rcm_msg: RemoteClientManagerMessage
 ) -> Tuple[VirtualClientManagerMessage, int, bool]:
-    print(f"RECEIVED: {rcm_msg}")
+    # print(f"RECEIVED: {rcm_msg}")
     if rcm_msg.HasField("get_pool_size"):
         return _get_pool_size(vcm), 0, True
     if rcm_msg.HasField("wakeup_clients"):
@@ -42,7 +42,7 @@ def handle(
 
 
 def _get_pool_size(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
-    print("> vcm.grpc_vcm.message_handler._get_pool_size()")
+    # print("> vcm.grpc_vcm.message_handler._get_pool_size()")
     # No need to deserialize _get_pool_size (it's empty)
     num_clients = vcm.get_pool_size()
     pool_size_res_proto = serde.get_pool_size_res_to_proto(num_clients)
@@ -51,9 +51,9 @@ def _get_pool_size(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
 
 def _wakeup_clients(vcm: VirtualClientManager, wakeup_msg: RemoteClientManagerMessage.WakeUpClients) -> VirtualClientManagerMessage:
     # Deserialize wakeup instruction
-    print("> vcm.grpc_vcm.message_handler._wakeup()")
+    # print("> vcm.grpc_vcm.message_handler._wakeup()")
     wakeup_clients_ins = serde.wakeup_clients_from_proto(wakeup_msg)
-    print(f"Telling VCM to wakup clinets: {wakeup_clients_ins}")
+    # print(f"Telling VCM to wakup clinets: {wakeup_clients_ins}")
     # Wake up clients w/ Ray
     vcm.wakeup_clients(wakeup_clients_ins.cids)
     res = serde.wakeup_clients_res_to_proto(Reason.ACK)
@@ -61,7 +61,7 @@ def _wakeup_clients(vcm: VirtualClientManager, wakeup_msg: RemoteClientManagerMe
 
 
 def _is_available(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
-    print("> vcm.grpc_vcm.message_handler._is_available()")
+    # print("> vcm.grpc_vcm.message_handler._is_available()")
     # No need to deserialize _is_available (it's empty)
     status = vcm.is_available()
     pool_size_res_proto = serde.is_available_res_to_proto(status)

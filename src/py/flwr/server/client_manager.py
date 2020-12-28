@@ -131,7 +131,7 @@ class SimpleClientManager(ClientManager):
         if min_num_clients is None:
             min_num_clients = num_clients
         
-        print(f"min_num_clients: {min_num_clients}")
+        # print(f"min_num_clients: {min_num_clients}")
         self.wait_for(min_num_clients)
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
@@ -190,10 +190,10 @@ class RemoteClientManager(SimpleClientManager):
             self._cv.notify_all()
 
     def get_virtual_pool_size(self) -> None:
-        print("RemoteClientManager.get_virtual_pool_size()")
+        # print("RemoteClientManager.get_virtual_pool_size()")
         getpoolsize_res = self.vcm.get_pool_size()
         self.pool_size = getpoolsize_res.pool_size
-        print(f"Received --> pool_size = {self.pool_size}")
+        # print(f"Received --> pool_size = {self.pool_size}")
 
     def wakeup_clients(self, cids: List[int]) -> None:
         """ Tells VCM which clients to use in this round/sub-round,
@@ -201,8 +201,7 @@ class RemoteClientManager(SimpleClientManager):
         that the machine where VCM is, can't allocate that many clients at a
         given time, if this happens it will use the first N (where N is the number
         of clients that the machine can allocate). """
-        #TODO: Ensure each sub-rounds in a round don't repeat cid
-        print(f"RemoteClientManager.wakeup_clients() for {cids}")
+        # print(f"RemoteClientManager.wakeup_clients() for {cids}")
         mssg = ""
         for n in cids[:-1]:
             mssg += str(n)
@@ -214,9 +213,9 @@ class RemoteClientManager(SimpleClientManager):
     def check_if_vcm_is_available(self) -> bool:
         """Check if there are Ray jobs running on the VirtualClientManager
         side."""
-        print("RemoteClientManager.check_if_vcm_is_available()")
+        # print("RemoteClientManager.check_if_vcm_is_available()")
         status_res = self.vcm.is_available()
-        print(f"OBTAINED: {status_res}")
+        # print(f"OBTAINED: {status_res}")
         return status_res.status
 
     def sample(
@@ -224,11 +223,11 @@ class RemoteClientManager(SimpleClientManager):
         num_clients: int,
         min_num_clients: Optional[int] = None,
         criterion: Optional[Criterion] = None,
-        virtual_pool: Optional[bool] = None,
     ) -> List[ClientProxy]:
         """ Randomly choose client id from pool, tell VirtualClientManager
         to wake up those clients, wait until they connect, then continue... """
 
+        # print(f"There are {len(self.clients)} clients connected")
         if min_num_clients is None:
             min_num_clients = num_clients
 
@@ -244,7 +243,7 @@ class RemoteClientManager(SimpleClientManager):
             self.wakeup_clients(cids)
 
         # Block until connected
-        print("Waiting for clients launched by VCM to connect")
+        # print("Waiting for clients launched by VCM to connect")
         self.wait_for(min_num_clients)
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
@@ -252,7 +251,7 @@ class RemoteClientManager(SimpleClientManager):
             available_cids = [
                 cid for cid in available_cids if criterion.select(self.clients[cid])
             ]
-        if virtual_pool:
-            num_clients = min(len(available_cids), num_clients)
+
+        num_clients = min(len(available_cids), num_clients)
         sampled_cids = random.sample(available_cids, num_clients)
         return [self.clients[cid] for cid in sampled_cids]

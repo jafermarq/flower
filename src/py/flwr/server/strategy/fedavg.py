@@ -51,7 +51,6 @@ class FedAvg(Strategy):
         on_fit_config_fn: Optional[Callable[[int], Dict[str, str]]] = None,
         on_evaluate_config_fn: Optional[Callable[[int], Dict[str, str]]] = None,
         accept_failures: bool = True,
-        virtual_client_pool: bool = False,
     ) -> None:
         super().__init__()
         self.min_fit_clients = min_fit_clients
@@ -63,7 +62,6 @@ class FedAvg(Strategy):
         self.on_fit_config_fn = on_fit_config_fn
         self.on_evaluate_config_fn = on_evaluate_config_fn
         self.accept_failures = accept_failures
-        self.virtual_client_pool = virtual_client_pool
 
     def __repr__(self) -> str:
         rep = f"FedAvg(accept_failures={self.accept_failures})"
@@ -103,12 +101,8 @@ class FedAvg(Strategy):
         sample_size, min_num_clients = self.num_fit_clients(
             client_manager.num_available()
         )
-        # Here we could pass min_num_clients = sample_size to avoid modifying
-        # the client manager class. Keep in thin this way howerever seems safer
-        # specially since in some scenarios launching a client might not be instantaneous
-        # therefore we'll benefit from that `wait` done by the client manager
         clients = client_manager.sample(
-            num_clients=sample_size, min_num_clients=min_num_clients, virtual_pool=self.virtual_client_pool
+            num_clients=sample_size, min_num_clients=min_num_clients
         )
 
         # Return client/config pairs
