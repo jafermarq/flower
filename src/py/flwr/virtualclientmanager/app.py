@@ -60,12 +60,17 @@ def start_virtual_client_manager(
             while True:
                 server_message = receive()
                 # print("VCM received a message.. passing to handler...")
-                print(f"server_message: {server_message}")
+                # print(f"server_message: {server_message}")
                 vcm_message, sleep_duration, keep_going = handle(
                     virtual_client_manager, server_message
                 )
                 send(vcm_message)
                 if not keep_going:
+                    # if break inmediatelly, grpc will trigger
+                    # GRPCBridgeClosed exception making the server crash
+                    # adding a 1s sleep seems enough
+                    # unsure atm why this isn't needed for clients app.py
+                    time.sleep(1)
                     break
         if sleep_duration == 0:
             log(INFO, "Disconnect and shut down")

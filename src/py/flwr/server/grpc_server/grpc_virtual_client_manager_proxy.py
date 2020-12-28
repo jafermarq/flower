@@ -63,3 +63,14 @@ class GrpcVirtualClientManagerProxy(VirtualClientManagerProxy):
 
         is_available_res = serde.is_available_res_from_proto(vcm_msg.is_available_res)
         return is_available_res
+
+    def disconnect(self) -> common.Disconnect:
+        disconnect_msg = serde.disconnect_vcm_to_proto()
+
+        vcm_msg: VirtualClientManagerMessage = self.bridge.request(
+            RemoteClientManagerMessage(disconnect=disconnect_msg)
+        )
+
+        disconnect_res = serde.disconnect_vcm_res_from_proto(vcm_msg)
+
+        return disconnect_res

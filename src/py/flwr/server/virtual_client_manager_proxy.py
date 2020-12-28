@@ -20,7 +20,8 @@ from abc import ABC, abstractmethod
 from flwr.common import (
     GetPoolSizeRes,
     WakeUpClientsIns,
-    IsAvailableRes
+    IsAvailableRes,
+    Disconnect
 )
 
 
@@ -42,3 +43,7 @@ class VirtualClientManagerProxy(ABC):
     @abstractmethod
     def is_available(self) -> IsAvailableRes:
         """Tells whether the VCM still has submitted jobs that haven't finished running"""
+
+    @abstractmethod
+    def disconnect(self) -> Disconnect:
+        """Shutdown signal from RemoteClientManager."""

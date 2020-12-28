@@ -84,11 +84,13 @@ message VirtualClientManagerMessage {
   message GetPoolSizeRes { int32 pool_size = 1; }
   message WakeUpClientsRes { Reason reason = 1; }
   message IsAvailableRes { bool available = 1; }
+  message DisconnectRes { Reason reason = 1;}
 
   oneof msg {
     GetPoolSizeRes get_pool_size_res = 1;
     WakeUpClientsRes wakeup_clients_res = 2;
     IsAvailableRes is_available_res = 3;
+    DisconnectRes disconnect_res = 4;
   }
 }
 
@@ -96,10 +98,12 @@ message RemoteClientManagerMessage {
   message GetPoolSize {}
   message WakeUpClients { string cids = 1; }
   message IsAvailable {}
+  message Disconnect {}
 
   oneof msg {
     GetPoolSize get_pool_size = 1;
     WakeUpClients wakeup_clients = 2;
     IsAvailable is_available = 3;
+    Disconnect disconnect = 4;
   }
 }

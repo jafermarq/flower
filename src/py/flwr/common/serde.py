@@ -66,6 +66,7 @@ def disconnect_to_proto(disconnect: typing.Disconnect) -> ClientMessage.Disconne
 
 def disconnect_from_proto(msg: ClientMessage.Disconnect) -> typing.Disconnect:
     """Deserialize flower.Disconnect from ProtoBuf message."""
+    print(f"serde.disconnect_from_proto: {msg}")
     if msg.reason == Reason.RECONNECT:
         return typing.Disconnect(reason="RECONNECT")
     if msg.reason == Reason.POWER_DISCONNECTED:
@@ -220,3 +221,17 @@ def is_available_res_to_proto(res: typing.IsAvailableRes) -> VirtualClientManage
 def is_available_res_from_proto(msg: VirtualClientManagerMessage.IsAvailableRes) -> typing.IsAvailableRes:
     status = msg.available
     return typing.IsAvailableRes(status=status)
+
+
+# === Disconnect VCM ===
+
+def disconnect_vcm_to_proto() -> RemoteClientManagerMessage.Disconnect:
+    return RemoteClientManagerMessage.Disconnect()
+
+
+def disconnect_vcm_res_to_proto(res: typing.Disconnect) -> VirtualClientManagerMessage.DisconnectRes:
+    return VirtualClientManagerMessage.DisconnectRes(reason=res)
+
+
+def disconnect_vcm_res_from_proto(msg: VirtualClientManagerMessage.DisconnectRes) -> typing.Disconnect:
+    return typing.Disconnect(msg)

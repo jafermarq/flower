@@ -17,6 +17,7 @@
 
 import random
 import threading
+import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
@@ -217,6 +218,11 @@ class RemoteClientManager(SimpleClientManager):
         status_res = self.vcm.is_available()
         # print(f"OBTAINED: {status_res}")
         return status_res.status
+
+    def shutdown_vcm(self) -> None:
+        """Tells VCM to shutdown."""
+        print("Telling VCM to shutdown...")
+        _ = self.vcm.disconnect()
 
     def sample(
         self,

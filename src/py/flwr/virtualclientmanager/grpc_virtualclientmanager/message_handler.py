@@ -32,6 +32,9 @@ def handle(
     vcm: VirtualClientManager, rcm_msg: RemoteClientManagerMessage
 ) -> Tuple[VirtualClientManagerMessage, int, bool]:
     # print(f"RECEIVED: {rcm_msg}")
+    if rcm_msg.HasField("disconnect"):
+        disconnect_msg, sleep_duration = _disconnect(vcm)
+        return disconnect_msg, sleep_duration, False
     if rcm_msg.HasField("get_pool_size"):
         return _get_pool_size(vcm), 0, True
     if rcm_msg.HasField("wakeup_clients"):
@@ -66,3 +69,13 @@ def _is_available(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
     status = vcm.is_available()
     pool_size_res_proto = serde.is_available_res_to_proto(status)
     return VirtualClientManagerMessage(is_available_res=pool_size_res_proto)
+
+
+# pylint: disable=unused-argument
+def _disconnect(vcm: VirtualClientManager) -> Tuple[VirtualClientManagerMessage, int]:
+    # Determine the reason for sending Disconnect message
+    reason = Reason.ACK
+    sleep_duration = 0
+    # Build Disconnect message
+    disconnect_res_proto = serde.disconnect_vcm_res_to_proto(reason)
+    return VirtualClientManagerMessage(disconnect_res=disconnect_res_proto), sleep_duration

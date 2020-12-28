@@ -124,6 +124,11 @@ class Server:
         end_time = timeit.default_timer()
         elapsed = end_time - start_time
         log(INFO, "[TIME] FL finished in %s", elapsed)
+
+        # Telling VirtualClientManager to shutdown
+        if isinstance(self._client_manager, RemoteClientManager):
+            self._client_manager.shutdown_vcm()
+
         return history
 
     def evaluate(

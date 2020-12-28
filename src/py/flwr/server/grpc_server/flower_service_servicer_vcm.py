@@ -20,7 +20,6 @@ Relevant knowledge for reading this modules code:
 from typing import Callable, Iterator
 
 import grpc
-# import time
 
 from flwr.proto import transport_pb2_grpc
 from flwr.proto.transport_pb2 import VirtualClientManagerMessage, RemoteClientManagerMessage
@@ -89,34 +88,23 @@ class FlowerServiceServicerVCM(transport_pb2_grpc.FlowerServiceVCMServicer):
                 wrapping the actual message
             - The Join method is (pretty much) protocol unaware
         """
-        # print("FlowerServiceServicer_v22222222222")
-        peer = context.peer()
-        # print("peer")
+
         bridge = self.grpc_bridge_factory()
-        # print("bridge") 
-        # client = self.client_factory(peer, bridge)
         client = self.vcm_factory(bridge)
-        # print("client")
         is_success = register_virtual_client_manager(self.client_manager, client, context)
-        # print(f"is_success: {is_success}")
 
         if is_success:
             # Get iterators
             client_message_iterator = request_iterator
             server_message_iterator = bridge.server_message_iterator()
-            # print("Obtained iterators")
             # All messages will be pushed to client bridge directly
             while True:
                 try:
                     # Get server message from bridge and yield it
                     server_message = next(server_message_iterator)
-                    # print(f"server_message: {server_message}")
-                    # print("sleeping for 3 seconds")
-                    # time.sleep(3)
                     yield server_message
                     # Wait for client message
                     client_message = next(client_message_iterator)
-                    # print(f"obtained client_message: {client_message}")
                     bridge.set_client_message(client_message)
                 except StopIteration:
                     break
