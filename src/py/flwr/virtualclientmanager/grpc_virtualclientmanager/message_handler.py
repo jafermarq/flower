@@ -41,6 +41,8 @@ def handle(
         return _wakeup_clients(vcm, rcm_msg.wakeup_clients), 0, True
     if rcm_msg.HasField("is_available"):
         return _is_available(vcm), 0, True
+    if rcm_msg.HasField("is_ready_for_sampling"):
+        return _is_ready_for_sampling(vcm), 0, True
     raise UnkownRemoteClientManagerMessage()
 
 
@@ -79,3 +81,13 @@ def _disconnect(vcm: VirtualClientManager) -> Tuple[VirtualClientManagerMessage,
     # Build Disconnect message
     disconnect_res_proto = serde.disconnect_vcm_res_to_proto(reason)
     return VirtualClientManagerMessage(disconnect_res=disconnect_res_proto), sleep_duration
+
+
+def _is_ready_for_sampling(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
+    # No need to deserialize _wait_for_sampling (it's empty)
+    res = vcm.is_ready_for_sampling()
+    # print("serde._is_ready_for_sampling()")
+    # print(f"res: {res}")
+    res_proto = serde.is_ready_for_sampling_res_to_proto(res)
+    # print(f"res_proto: {res_proto}")
+    return VirtualClientManagerMessage(is_ready_for_sampling_res=res_proto)

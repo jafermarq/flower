@@ -20,7 +20,8 @@ from abc import ABC, abstractmethod
 from flwr.common import (
     GetPoolSizeRes,
     WakeUpClientsIns,
-    IsAvailableRes
+    IsAvailableRes,
+    ReadyForSamplingRes
 )
 
 
@@ -42,3 +43,7 @@ class VirtualClientManager(ABC):
     @abstractmethod
     def is_available(self) -> IsAvailableRes:
         """Tells whether the VCM still has submitted jobs that haven't finished running."""
+
+    @abstractmethod
+    def is_ready_for_sampling(self) -> ReadyForSamplingRes:
+        """Tels RemoteClientManager that some clients are ready to be sampled."""

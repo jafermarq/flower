@@ -115,3 +115,12 @@ class IsAvailableRes:
     if it is still running jobs from previous `wakeup_clients` request."""
 
     status: bool
+
+
+@dataclass
+class ReadyForSamplingRes:
+    """Contains: boolean telling if the RemoteClientManager can sample from the
+    connected clients and a integer that indicates the number of clients ready."""
+
+    wait: bool
+    num_clients: int

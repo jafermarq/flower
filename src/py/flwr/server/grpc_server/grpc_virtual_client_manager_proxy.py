@@ -74,3 +74,14 @@ class GrpcVirtualClientManagerProxy(VirtualClientManagerProxy):
         disconnect_res = serde.disconnect_vcm_res_from_proto(vcm_msg)
 
         return disconnect_res
+
+    def is_ready_for_sampling(self) -> common.ReadyForSamplingRes:
+
+        is_ready_for_sampling_msg = serde.is_ready_for_sampling_to_proto()
+
+        vcm_msg: VirtualClientManagerMessage = self.bridge.request(
+            RemoteClientManagerMessage(is_ready_for_sampling=is_ready_for_sampling_msg)
+        )
+        # print("is_ready_for_sampling")
+        # print(f"vcm_msg: {vcm_msg}")
+        return serde.is_ready_for_sampling_res_from_proto(vcm_msg.is_ready_for_sampling_res)

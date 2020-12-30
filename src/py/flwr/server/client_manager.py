@@ -254,9 +254,22 @@ class RemoteClientManager(SimpleClientManager):
         # for very short on-client training pipelines, this timer might
         # become a bottleneck in the whole FL pipeline.
         # TODO: avoid using a timer and instead wait until the VCM sends a message saying that no more clients can't be allocated use that signal to continue
+
+        wait = True
+        clients_wait_for = 0
+        while wait:
+            res = self.vcm.is_ready_for_sampling()
+            print(f"client_manager go: {res}")
+            wait = res.wait
+            clients_wait_for = res.num_clients
+            time.sleep(1)
+
+        # ! Ideally here we'd use `clients_wait_for` but isn't working that great...
         self.wait_for(min_num_clients)
+
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
+        print(f'available_cids: {available_cids}')
         if criterion is not None:
             available_cids = [
                 cid for cid in available_cids if criterion.select(self.clients[cid])

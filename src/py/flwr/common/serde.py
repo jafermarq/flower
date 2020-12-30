@@ -235,3 +235,20 @@ def disconnect_vcm_res_to_proto(res: typing.Disconnect) -> VirtualClientManagerM
 
 def disconnect_vcm_res_from_proto(msg: VirtualClientManagerMessage.DisconnectRes) -> typing.Disconnect:
     return typing.Disconnect(msg)
+
+
+# === WaitForSampling messages ===
+
+
+def is_ready_for_sampling_to_proto() -> RemoteClientManagerMessage.IsReadyForSampling:
+    return RemoteClientManagerMessage.IsReadyForSampling()
+
+
+def is_ready_for_sampling_res_to_proto(res: typing.ReadyForSamplingRes) -> VirtualClientManagerMessage.IsReadyForSamplingRes:
+    # print("serde.is_ready_for_sampling_res_to_proto")
+    return VirtualClientManagerMessage.IsReadyForSamplingRes(wait=res.wait, num_clients=res.num_clients)
+
+
+def is_ready_for_sampling_res_from_proto(msg: VirtualClientManagerMessage.IsReadyForSamplingRes) -> typing.ReadyForSamplingRes:
+    # print("serde.is_ready_for_sampling_res_from_proto")
+    return typing.ReadyForSamplingRes(wait=msg.wait, num_clients=msg.num_clients)
