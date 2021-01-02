@@ -248,28 +248,26 @@ class RemoteClientManager(SimpleClientManager):
         if self.check_if_vcm_is_available():
             self.wakeup_clients(cids)
 
-        # Block until connected
-        # with a VCM we'll always exhaust the waiting time, therefore
-        # the timeout in self.wait_for should be a low number (3-10s)
-        # for very short on-client training pipelines, this timer might
-        # become a bottleneck in the whole FL pipeline.
-        # TODO: avoid using a timer and instead wait until the VCM sends a message saying that no more clients can't be allocated use that signal to continue
+        # Block until clients managed by VCM are instantiated,
+        # allocated, warmedup and connected to the server.
 
         wait = True
         clients_wait_for = 0
         while wait:
+            # ask VCM whether clients are ready and how many are online
             res = self.vcm.is_ready_for_sampling()
-            print(f"client_manager go: {res}")
+            # print(f"client_manager got: {res}")
             wait = res.wait
             clients_wait_for = res.num_clients
-            time.sleep(1)
+            time.sleep(2)
 
-        # ! Ideally here we'd use `clients_wait_for` but isn't working that great...
-        self.wait_for(min_num_clients)
+        # ensure the number of clients that VCM said are online
+        # are indeed connected
+        self.wait_for(clients_wait_for)
 
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
-        print(f'available_cids: {available_cids}')
+        # print(f'available_cids: {available_cids}')
         if criterion is not None:
             available_cids = [
                 cid for cid in available_cids if criterion.select(self.clients[cid])
