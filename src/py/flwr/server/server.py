@@ -167,6 +167,15 @@ class Server:
         if isinstance(self._client_manager, RemoteClientManager):
             results = []
             failures = []
+
+            # if first round, shutdown client wokeup for `_get_initial_weights()`
+            if rnd == 1:
+                all_clients = self._client_manager.all()
+                _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
+
+            # indicate that a new round starts so RCM should wait for VCM to be available
+            self._client_manager.wait_until_vcm_is_available = True
+
             with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
                 while len(results) < self.strategy.min_fit_clients:
 

@@ -152,6 +152,9 @@ class RemoteClientManager(SimpleClientManager):
         super(RemoteClientManager, self).__init__()
         self.vcm: VirtualClientManagerProxy = None
         self.pool_size: int
+        # need to initialize with true for first client
+        # woken up when server._get_initial_weights()
+        self.wait_until_vcm_is_available = True
 
     def wait_for_vcm(self, timeout: int = 86400) -> bool:
         """Block until a VirtualClientManager has connected.
@@ -215,9 +218,16 @@ class RemoteClientManager(SimpleClientManager):
         """Check if there are Ray jobs running on the VirtualClientManager
         side."""
         # print("RemoteClientManager.check_if_vcm_is_available()")
-        status_res = self.vcm.is_available()
+        # print(f"will wait?: {self.wait_until_vcm_is_available}")
+        available = False
+
+        while not(available) and self.wait_until_vcm_is_available:
+            available = self.vcm.is_available().status
+            time.sleep(5)
+
+        self.wait_until_vcm_is_available = False
         # print(f"OBTAINED: {status_res}")
-        return status_res.status
+        return available
 
     def shutdown_vcm(self) -> None:
         """Tells VCM to shutdown."""
@@ -256,7 +266,7 @@ class RemoteClientManager(SimpleClientManager):
         while wait:
             # ask VCM whether clients are ready and how many are online
             res = self.vcm.is_ready_for_sampling()
-            # print(f"client_manager got: {res}")
+            print(f"client_manager got: {res}")
             wait = res.wait
             clients_wait_for = res.num_clients
             time.sleep(2)
@@ -267,7 +277,7 @@ class RemoteClientManager(SimpleClientManager):
 
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
-        # print(f'available_cids: {available_cids}')
+        print(f'available_cids: {available_cids}')
         if criterion is not None:
             available_cids = [
                 cid for cid in available_cids if criterion.select(self.clients[cid])
