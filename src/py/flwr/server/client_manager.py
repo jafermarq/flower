@@ -162,7 +162,7 @@ class RemoteClientManager(SimpleClientManager):
         Current timeout default: 1 day.
         """
 
-        print("Waiting for VirtualClientManager to connect w/ server...")
+        print("Waiting for VirtualClientManager to connect with server...")
         with self._cv:
             return self._cv.wait_for(
                 lambda: self.vcm is not None, timeout=timeout
@@ -194,18 +194,18 @@ class RemoteClientManager(SimpleClientManager):
             self._cv.notify_all()
 
     def get_virtual_pool_size(self) -> None:
-        # print("RemoteClientManager.get_virtual_pool_size()")
-        getpoolsize_res = self.vcm.get_pool_size()
-        self.pool_size = getpoolsize_res.pool_size
-        # print(f"Received --> pool_size = {self.pool_size}")
+        """ Gets the size of the virtual pool on the VCM's side."""
+        self.pool_size = self.vcm.get_pool_size().pool_size
+        print(f"Received --> pool_size = {self.pool_size} clients.")
 
     def wakeup_clients(self, cids: List[int]) -> None:
         """ Tells VCM which clients to use in this round/sub-round,
         len(cids) == number clients to use in round. It can perfectly happen
         that the machine where VCM is, can't allocate that many clients at a
         given time, if this happens it will use the first N (where N is the number
-        of clients that the machine can allocate). """
-        # print(f"RemoteClientManager.wakeup_clients() for {cids}")
+        of clients that the machine can allocate), then the next N, until
+        all clients have done the specified amount of local epochs."""
+
         mssg = ""
         for n in cids[:-1]:
             mssg += str(n)
@@ -217,10 +217,7 @@ class RemoteClientManager(SimpleClientManager):
     def check_if_vcm_is_available(self) -> bool:
         """Check if there are Ray jobs running on the VirtualClientManager
         side."""
-        # print("RemoteClientManager.check_if_vcm_is_available()")
-        # print(f"will wait?: {self.wait_until_vcm_is_available}")
         available = False
-
         while not(available) and self.wait_until_vcm_is_available:
             available = self.vcm.is_available().status
             time.sleep(5)
@@ -266,7 +263,7 @@ class RemoteClientManager(SimpleClientManager):
         while wait:
             # ask VCM whether clients are ready and how many are online
             res = self.vcm.is_ready_for_sampling()
-            print(f"client_manager got: {res}")
+            # print(f"client_manager got: {res}")
             wait = res.wait
             clients_wait_for = res.num_clients
             time.sleep(2)
@@ -277,7 +274,7 @@ class RemoteClientManager(SimpleClientManager):
 
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
-        print(f'available_cids: {available_cids}')
+        # print(f'available_cids: {available_cids}')
         if criterion is not None:
             available_cids = [
                 cid for cid in available_cids if criterion.select(self.clients[cid])
