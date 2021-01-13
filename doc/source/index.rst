@@ -1,5 +1,5 @@
-Flower Docs
-===========
+Flower Documentation
+====================
 
 Welcome to Flower's documentation. `Flower <https://flower.dev>`_ is a friendly federated learning framework.
 
@@ -22,18 +22,19 @@ Flower's design goals was to make this simple. Read on to learn more.
    implementing-strategies
    examples
    example_walkthrough_pytorch_mnist
+   example-pytorch-from-centralized-to-federated
    recommended-env-setup
-   howto-aws
    changelog
 
 
 API Reference
------------------
+-------------
 
 .. toctree::
    :maxdepth: 3
+   :caption: API Reference
 
-   api_documentation/modules
+   flwr <apiref-flwr>
 
 
 Contributor Guide
@@ -52,12 +53,12 @@ intended to help along the way.
    release_process
 
 
-About Flower
-------------
+About
+-----
 
 .. toctree::
    :maxdepth: 1
-   :caption: About Flower
+   :caption: About
 
    people
    organizations
