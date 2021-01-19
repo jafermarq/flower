@@ -18,7 +18,7 @@
 import concurrent.futures
 import timeit
 from logging import DEBUG, INFO
-from typing import List, Optional, Tuple, cast, Callable
+from typing import List, Optional, Tuple, cast, Callable, Dict
 
 from flwr.common import (
     Disconnect,
@@ -56,7 +56,7 @@ class Server:
     def __init__(
         self, client_manager: ClientManager, strategy: Optional[Strategy] = None,
         on_init_fn: Optional[Callable[[None], None]] = None,
-        on_round_end_fn: Optional[Callable[[None], None]] = None,
+        on_round_end_fn: Optional[Callable[[Dict], None]] = None,
     ) -> None:
         self._client_manager: ClientManager = client_manager
         self.weights: Weights = []
@@ -64,9 +64,14 @@ class Server:
         self.on_init_fn = on_init_fn
         self.on_round_end_fn = on_round_end_fn
 
+        # make these actual class methods (if defined)
+        if self.on_init_fn:
+            self.on_init_fn = on_init_fn.__get__(self, type(self))
+        if self.on_round_end_fn:
+            self.on_round_end_fn = on_round_end_fn.__get__(self, type(self))
+
         if self.on_init_fn:
             self.on_init_fn()
-
 
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
@@ -124,7 +129,8 @@ class Server:
 
             # Round ended, run post round stages
             if self.on_round_end_fn:
-                self.on_round_end_fn()
+                args = {'current_round': current_round}
+                self.on_round_end_fn(args)
 
         # Bookkeeping
         end_time = timeit.default_timer()
