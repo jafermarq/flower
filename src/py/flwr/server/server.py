@@ -18,7 +18,7 @@
 import concurrent.futures
 import timeit
 from logging import DEBUG, INFO
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, Tuple, cast, Callable
 from tqdm import tqdm
 
 from flwr.common import (
@@ -57,10 +57,18 @@ class Server:
     def __init__(
         self, client_manager: ClientManager,
         strategy: Optional[Strategy] = None,
+        on_init_fn: Optional[Callable[[None], None]] = None,
+        on_round_end_fn: Optional[Callable[[None], None]] = None,
     ) -> None:
         self._client_manager: ClientManager = client_manager
         self.weights: Weights = []
         self.strategy: Strategy = set_strategy(strategy)
+        self.on_init_fn = on_init_fn
+        self.on_round_end_fn = on_round_end_fn
+
+        if self.on_init_fn:
+            self.on_init_fn()
+
 
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
@@ -115,6 +123,10 @@ class Server:
                 history.add_loss_distributed(
                     rnd=current_round, loss=cast(float, loss_fed)
                 )
+
+            # Round ended, run post round stages
+            if self.on_round_end_fn:
+                self.on_round_end_fn()
 
         # Bookkeeping
         end_time = timeit.default_timer()

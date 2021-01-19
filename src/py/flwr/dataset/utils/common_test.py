@@ -53,16 +53,8 @@ class ImageClassificationPartitionedTestCase(unittest.TestCase):
     as CIFAR-10/100."""
 
     def setUp(self) -> None:
-        self.num_classes: int = 10
-        self.num_samples_per_class: int = 1000
-        self.num_samples: int = self.num_classes * self.num_samples_per_class
-        x = np.random.random(size=(self.num_samples, 3, 32, 32))
-        y = np.concatenate(
-            np.array(
-                [self.num_samples_per_class * [j] for j in range(self.num_classes)]
-            ),
-            axis=0,
-        )
+        x = np.random.random(size=(500, 3, 32, 32))  # pylint: disable=no-member
+        y = np.concatenate(np.array([50 * [j] for j in range(10)]), axis=0)
         y = np.expand_dims(y, axis=1)
 
         np.random.seed(2000)
