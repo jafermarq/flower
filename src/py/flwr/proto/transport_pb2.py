@@ -19,6 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='flower.transport',
   syntax='proto3',
   serialized_options=None,
+  create_key=_descriptor._internal_create_key,
   serialized_pb=b'\n\x1a\x66lwr/proto/transport.proto\x12\x10\x66lower.transport\"2\n\nParameters\x12\x0f\n\x07tensors\x18\x01 \x03(\x0c\x12\x13\n\x0btensor_type\x18\x02 \x01(\t\"\xb8\x05\n\rServerMessage\x12>\n\treconnect\x18\x01 \x01(\x0b\x32).flower.transport.ServerMessage.ReconnectH\x00\x12G\n\x0eget_parameters\x18\x02 \x01(\x0b\x32-.flower.transport.ServerMessage.GetParametersH\x00\x12\x39\n\x07\x66it_ins\x18\x03 \x01(\x0b\x32&.flower.transport.ServerMessage.FitInsH\x00\x12\x43\n\x0c\x65valuate_ins\x18\x04 \x01(\x0b\x32+.flower.transport.ServerMessage.EvaluateInsH\x00\x1a\x1c\n\tReconnect\x12\x0f\n\x07seconds\x18\x01 \x01(\x03\x1a\x0f\n\rGetParameters\x1a\xad\x01\n\x06\x46itIns\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12\x42\n\x06\x63onfig\x18\x02 \x03(\x0b\x32\x32.flower.transport.ServerMessage.FitIns.ConfigEntry\x1a-\n\x0b\x43onfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\xb7\x01\n\x0b\x45valuateIns\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12G\n\x06\x63onfig\x18\x02 \x03(\x0b\x32\x37.flower.transport.ServerMessage.EvaluateIns.ConfigEntry\x1a-\n\x0b\x43onfigEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x05\n\x03msg\"\x87\x06\n\rClientMessage\x12@\n\ndisconnect\x18\x01 \x01(\x0b\x32*.flower.transport.ClientMessage.DisconnectH\x00\x12G\n\x0eparameters_res\x18\x02 \x01(\x0b\x32-.flower.transport.ClientMessage.ParametersResH\x00\x12\x39\n\x07\x66it_res\x18\x03 \x01(\x0b\x32&.flower.transport.ClientMessage.FitResH\x00\x12\x43\n\x0c\x65valuate_res\x18\x04 \x01(\x0b\x32+.flower.transport.ClientMessage.EvaluateResH\x00\x1a\x36\n\nDisconnect\x12(\n\x06reason\x18\x01 \x01(\x0e\x32\x18.flower.transport.Reason\x1a\x41\n\rParametersRes\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x1a\x89\x01\n\x06\x46itRes\x12\x30\n\nparameters\x18\x01 \x01(\x0b\x32\x1c.flower.transport.Parameters\x12\x14\n\x0cnum_examples\x18\x02 \x01(\x03\x12\x1d\n\x11num_examples_ceil\x18\x03 \x01(\x03\x42\x02\x18\x01\x12\x18\n\x0c\x66it_duration\x18\x04 \x01(\x02\x42\x02\x18\x01\x1a\xdc\x01\n\x0b\x45valuateRes\x12\x14\n\x0cnum_examples\x18\x01 \x01(\x03\x12\x0c\n\x04loss\x18\x02 \x01(\x02\x12\x14\n\x08\x61\x63\x63uracy\x18\x03 \x01(\x02\x42\x02\x18\x01\x12I\n\x07metrics\x18\x04 \x03(\x0b\x32\x38.flower.transport.ClientMessage.EvaluateRes.MetricsEntry\x1aH\n\x0cMetricsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\'\n\x05value\x18\x02 \x01(\x0b\x32\x18.flower.transport.Scalar:\x02\x38\x01\x42\x05\n\x03msg\"\xf7\x05\n\x1bVirtualClientManagerMessage\x12Y\n\x11get_pool_size_res\x18\x01 \x01(\x0b\x32<.flower.transport.VirtualClientManagerMessage.GetPoolSizeResH\x00\x12\\\n\x12wakeup_clients_res\x18\x02 \x01(\x0b\x32>.flower.transport.VirtualClientManagerMessage.WakeUpClientsResH\x00\x12X\n\x10is_available_res\x18\x03 \x01(\x0b\x32<.flower.transport.VirtualClientManagerMessage.IsAvailableResH\x00\x12U\n\x0e\x64isconnect_res\x18\x04 \x01(\x0b\x32;.flower.transport.VirtualClientManagerMessage.DisconnectResH\x00\x12h\n\x19is_ready_for_sampling_res\x18\x05 \x01(\x0b\x32\x43.flower.transport.VirtualClientManagerMessage.IsReadyForSamplingResH\x00\x1a#\n\x0eGetPoolSizeRes\x12\x11\n\tpool_size\x18\x01 \x01(\x05\x1a<\n\x10WakeUpClientsRes\x12(\n\x06reason\x18\x01 \x01(\x0e\x32\x18.flower.transport.Reason\x1a#\n\x0eIsAvailableRes\x12\x11\n\tavailable\x18\x01 \x01(\x08\x1a\x39\n\rDisconnectRes\x12(\n\x06reason\x18\x01 \x01(\x0e\x32\x18.flower.transport.Reason\x1a:\n\x15IsReadyForSamplingRes\x12\x0c\n\x04wait\x18\x01 \x01(\x08\x12\x13\n\x0bnum_clients\x18\x02 \x01(\x05\x42\x05\n\x03msg\"\xb0\x04\n\x1aRemoteClientManagerMessage\x12Q\n\rget_pool_size\x18\x01 \x01(\x0b\x32\x38.flower.transport.RemoteClientManagerMessage.GetPoolSizeH\x00\x12T\n\x0ewakeup_clients\x18\x02 \x01(\x0b\x32:.flower.transport.RemoteClientManagerMessage.WakeUpClientsH\x00\x12P\n\x0cis_available\x18\x03 \x01(\x0b\x32\x38.flower.transport.RemoteClientManagerMessage.IsAvailableH\x00\x12M\n\ndisconnect\x18\x04 \x01(\x0b\x32\x37.flower.transport.RemoteClientManagerMessage.DisconnectH\x00\x12`\n\x15is_ready_for_sampling\x18\x05 \x01(\x0b\x32?.flower.transport.RemoteClientManagerMessage.IsReadyForSamplingH\x00\x1a\r\n\x0bGetPoolSize\x1a\x1d\n\rWakeUpClients\x12\x0c\n\x04\x63ids\x18\x01 \x01(\t\x1a\r\n\x0bIsAvailable\x1a\x0c\n\nDisconnect\x1a\x14\n\x12IsReadyForSamplingB\x05\n\x03msg\"i\n\x06Scalar\x12\x10\n\x06\x64ouble\x18\x01 \x01(\x01H\x00\x12\x10\n\x06sint64\x18\x08 \x01(\x12H\x00\x12\x0e\n\x04\x62ool\x18\r \x01(\x08H\x00\x12\x10\n\x06string\x18\x0e \x01(\tH\x00\x12\x0f\n\x05\x62ytes\x18\x0f \x01(\x0cH\x00\x42\x08\n\x06scalar*[\n\x06Reason\x12\x0b\n\x07UNKNOWN\x10\x00\x12\r\n\tRECONNECT\x10\x01\x12\x16\n\x12POWER_DISCONNECTED\x10\x02\x12\x14\n\x10WIFI_UNAVAILABLE\x10\x03\x12\x07\n\x03\x41\x43K\x10\x04\x32_\n\rFlowerService\x12N\n\x04Join\x12\x1f.flower.transport.ClientMessage\x1a\x1f.flower.transport.ServerMessage\"\x00(\x01\x30\x01\x32}\n\x10\x46lowerServiceVCM\x12i\n\x04Join\x12-.flower.transport.VirtualClientManagerMessage\x1a,.flower.transport.RemoteClientManagerMessage\"\x00(\x01\x30\x01\x62\x06proto3'
 )
 
@@ -643,6 +644,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_GETPOOLSIZERES = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='pool_size', full_name='flower.transport.VirtualClientManagerMessage.GetPoolSizeRes.pool_size', index=0,
@@ -650,7 +652,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_GETPOOLSIZERES = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -673,6 +675,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='reason', full_name='flower.transport.VirtualClientManagerMessage.WakeUpClientsRes.reason', index=0,
@@ -680,7 +683,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_WAKEUPCLIENTSRES = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -703,6 +706,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_ISAVAILABLERES = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='available', full_name='flower.transport.VirtualClientManagerMessage.IsAvailableRes.available', index=0,
@@ -710,7 +714,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_ISAVAILABLERES = _descriptor.Descriptor(
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -733,6 +737,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_DISCONNECTRES = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='reason', full_name='flower.transport.VirtualClientManagerMessage.DisconnectRes.reason', index=0,
@@ -740,7 +745,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_DISCONNECTRES = _descriptor.Descriptor(
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -763,6 +768,7 @@ _VIRTUALCLIENTMANAGERMESSAGE_ISREADYFORSAMPLINGRES = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='wait', full_name='flower.transport.VirtualClientManagerMessage.IsReadyForSamplingRes.wait', index=0,
@@ -770,14 +776,14 @@ _VIRTUALCLIENTMANAGERMESSAGE_ISREADYFORSAMPLINGRES = _descriptor.Descriptor(
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='num_clients', full_name='flower.transport.VirtualClientManagerMessage.IsReadyForSamplingRes.num_clients', index=1,
       number=2, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -800,6 +806,7 @@ _VIRTUALCLIENTMANAGERMESSAGE = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='get_pool_size_res', full_name='flower.transport.VirtualClientManagerMessage.get_pool_size_res', index=0,
@@ -807,35 +814,35 @@ _VIRTUALCLIENTMANAGERMESSAGE = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='wakeup_clients_res', full_name='flower.transport.VirtualClientManagerMessage.wakeup_clients_res', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='is_available_res', full_name='flower.transport.VirtualClientManagerMessage.is_available_res', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='disconnect_res', full_name='flower.transport.VirtualClientManagerMessage.disconnect_res', index=3,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='is_ready_for_sampling_res', full_name='flower.transport.VirtualClientManagerMessage.is_ready_for_sampling_res', index=4,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -849,7 +856,9 @@ _VIRTUALCLIENTMANAGERMESSAGE = _descriptor.Descriptor(
   oneofs=[
     _descriptor.OneofDescriptor(
       name='msg', full_name='flower.transport.VirtualClientManagerMessage.msg',
-      index=0, containing_type=None, fields=[]),
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
   ],
   serialized_start=1578,
   serialized_end=2337,
@@ -862,6 +871,7 @@ _REMOTECLIENTMANAGERMESSAGE_GETPOOLSIZE = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
   ],
   extensions=[
@@ -885,6 +895,7 @@ _REMOTECLIENTMANAGERMESSAGE_WAKEUPCLIENTS = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='cids', full_name='flower.transport.RemoteClientManagerMessage.WakeUpClients.cids', index=0,
@@ -892,7 +903,7 @@ _REMOTECLIENTMANAGERMESSAGE_WAKEUPCLIENTS = _descriptor.Descriptor(
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -915,6 +926,7 @@ _REMOTECLIENTMANAGERMESSAGE_ISAVAILABLE = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
   ],
   extensions=[
@@ -938,6 +950,7 @@ _REMOTECLIENTMANAGERMESSAGE_DISCONNECT = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
   ],
   extensions=[
@@ -961,6 +974,7 @@ _REMOTECLIENTMANAGERMESSAGE_ISREADYFORSAMPLING = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
   ],
   extensions=[
@@ -984,6 +998,7 @@ _REMOTECLIENTMANAGERMESSAGE = _descriptor.Descriptor(
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
+  create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
       name='get_pool_size', full_name='flower.transport.RemoteClientManagerMessage.get_pool_size', index=0,
@@ -991,35 +1006,35 @@ _REMOTECLIENTMANAGERMESSAGE = _descriptor.Descriptor(
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='wakeup_clients', full_name='flower.transport.RemoteClientManagerMessage.wakeup_clients', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='is_available', full_name='flower.transport.RemoteClientManagerMessage.is_available', index=2,
       number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='disconnect', full_name='flower.transport.RemoteClientManagerMessage.disconnect', index=3,
       number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
       name='is_ready_for_sampling', full_name='flower.transport.RemoteClientManagerMessage.is_ready_for_sampling', index=4,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -1033,7 +1048,9 @@ _REMOTECLIENTMANAGERMESSAGE = _descriptor.Descriptor(
   oneofs=[
     _descriptor.OneofDescriptor(
       name='msg', full_name='flower.transport.RemoteClientManagerMessage.msg',
-      index=0, containing_type=None, fields=[]),
+      index=0, containing_type=None,
+      create_key=_descriptor._internal_create_key,
+    fields=[]),
   ],
   serialized_start=2340,
   serialized_end=2900,
@@ -1456,14 +1473,9 @@ _FLOWERSERVICE = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-<<<<<<< HEAD
+  create_key=_descriptor._internal_create_key,
   serialized_start=3102,
   serialized_end=3197,
-=======
-  create_key=_descriptor._internal_create_key,
-  serialized_start=1777,
-  serialized_end=1872,
->>>>>>> checkpoint
   methods=[
   _descriptor.MethodDescriptor(
     name='Join',
@@ -1487,6 +1499,7 @@ _FLOWERSERVICEVCM = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=1,
   serialized_options=None,
+  create_key=_descriptor._internal_create_key,
   serialized_start=3199,
   serialized_end=3324,
   methods=[
@@ -1498,6 +1511,7 @@ _FLOWERSERVICEVCM = _descriptor.ServiceDescriptor(
     input_type=_VIRTUALCLIENTMANAGERMESSAGE,
     output_type=_REMOTECLIENTMANAGERMESSAGE,
     serialized_options=None,
+    create_key=_descriptor._internal_create_key,
   ),
 ])
 _sym_db.RegisterServiceDescriptor(_FLOWERSERVICEVCM)

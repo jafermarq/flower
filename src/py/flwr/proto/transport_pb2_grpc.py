@@ -32,55 +32,96 @@ class FlowerServiceServicer(object):
 
 
 def add_FlowerServiceServicer_to_server(servicer, server):
-  rpc_method_handlers = {
-      'Join': grpc.stream_stream_rpc_method_handler(
-          servicer.Join,
-          request_deserializer=flwr_dot_proto_dot_transport__pb2.ClientMessage.FromString,
-          response_serializer=flwr_dot_proto_dot_transport__pb2.ServerMessage.SerializeToString,
-      ),
-  }
-  generic_handler = grpc.method_handlers_generic_handler(
-      'flower.transport.FlowerService', rpc_method_handlers)
-  server.add_generic_rpc_handlers((generic_handler,))
+    rpc_method_handlers = {
+            'Join': grpc.stream_stream_rpc_method_handler(
+                    servicer.Join,
+                    request_deserializer=flwr_dot_proto_dot_transport__pb2.ClientMessage.FromString,
+                    response_serializer=flwr_dot_proto_dot_transport__pb2.ServerMessage.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'flower.transport.FlowerService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+
+
+ # This class is part of an EXPERIMENTAL API.
+class FlowerService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Join(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(request_iterator, target, '/flower.transport.FlowerService/Join',
+            flwr_dot_proto_dot_transport__pb2.ClientMessage.SerializeToString,
+            flwr_dot_proto_dot_transport__pb2.ServerMessage.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
 
 class FlowerServiceVCMStub(object):
-  # missing associated documentation comment in .proto file
-  pass
+    """Missing associated documentation comment in .proto file."""
 
-  def __init__(self, channel):
-    """Constructor.
+    def __init__(self, channel):
+        """Constructor.
 
-    Args:
-      channel: A grpc.Channel.
-    """
-    self.Join = channel.stream_stream(
-        '/flower.transport.FlowerServiceVCM/Join',
-        request_serializer=flwr_dot_proto_dot_transport__pb2.VirtualClientManagerMessage.SerializeToString,
-        response_deserializer=flwr_dot_proto_dot_transport__pb2.RemoteClientManagerMessage.FromString,
-        )
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.Join = channel.stream_stream(
+                '/flower.transport.FlowerServiceVCM/Join',
+                request_serializer=flwr_dot_proto_dot_transport__pb2.VirtualClientManagerMessage.SerializeToString,
+                response_deserializer=flwr_dot_proto_dot_transport__pb2.RemoteClientManagerMessage.FromString,
+                )
 
 
 class FlowerServiceVCMServicer(object):
-  # missing associated documentation comment in .proto file
-  pass
+    """Missing associated documentation comment in .proto file."""
 
-  def Join(self, request_iterator, context):
-    # missing associated documentation comment in .proto file
-    pass
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
+    def Join(self, request_iterator, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
 
 def add_FlowerServiceVCMServicer_to_server(servicer, server):
-  rpc_method_handlers = {
-      'Join': grpc.stream_stream_rpc_method_handler(
-          servicer.Join,
-          request_deserializer=flwr_dot_proto_dot_transport__pb2.VirtualClientManagerMessage.FromString,
-          response_serializer=flwr_dot_proto_dot_transport__pb2.RemoteClientManagerMessage.SerializeToString,
-      ),
-  }
-  generic_handler = grpc.method_handlers_generic_handler(
-      'flower.transport.FlowerServiceVCM', rpc_method_handlers)
-  server.add_generic_rpc_handlers((generic_handler,))
+    rpc_method_handlers = {
+            'Join': grpc.stream_stream_rpc_method_handler(
+                    servicer.Join,
+                    request_deserializer=flwr_dot_proto_dot_transport__pb2.VirtualClientManagerMessage.FromString,
+                    response_serializer=flwr_dot_proto_dot_transport__pb2.RemoteClientManagerMessage.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'flower.transport.FlowerServiceVCM', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+
+
+ # This class is part of an EXPERIMENTAL API.
+class FlowerServiceVCM(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def Join(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(request_iterator, target, '/flower.transport.FlowerServiceVCM/Join',
+            flwr_dot_proto_dot_transport__pb2.VirtualClientManagerMessage.SerializeToString,
+            flwr_dot_proto_dot_transport__pb2.RemoteClientManagerMessage.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
