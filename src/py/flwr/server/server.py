@@ -51,6 +51,10 @@ def set_strategy(strategy: Optional[Strategy]) -> Strategy:
     return strategy if strategy is not None else FedAvg()
 
 
+def func_to_method(f, obj):
+    return f.__get__(obj, type(obj)) if f else lambda: None
+
+
 class Server:
     """Flower server."""
 
@@ -63,17 +67,12 @@ class Server:
         self._client_manager: ClientManager = client_manager
         self.weights: Weights = []
         self.strategy: Strategy = set_strategy(strategy)
-        self.on_init_fn = on_init_fn
-        self.on_round_end_fn = on_round_end_fn
 
         # make these actual class methods (if defined)
-        if self.on_init_fn:
-            self.on_init_fn = on_init_fn.__get__(self, type(self))
-        if self.on_round_end_fn:
-            self.on_round_end_fn = on_round_end_fn.__get__(self, type(self))
+        self.on_init_fn = func_to_method(on_init_fn, self)
+        self.on_round_end_fn = func_to_method(on_round_end_fn, self)
 
-        if self.on_init_fn:
-            self.on_init_fn()
+        self.on_init_fn()
 
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
@@ -130,9 +129,8 @@ class Server:
                 )
 
             # Round ended, run post round stages
-            if self.on_round_end_fn:
-                args = {'current_round': current_round}
-                self.on_round_end_fn(args)
+            args = {'current_round': current_round}
+            self.on_round_end_fn(args)
 
         # Bookkeeping
         end_time = timeit.default_timer()
