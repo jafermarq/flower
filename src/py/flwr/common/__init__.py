@@ -28,6 +28,7 @@ from .typing import Metrics as Metrics
 from .typing import Parameters as Parameters
 from .typing import ParametersRes as ParametersRes
 from .typing import Reconnect as Reconnect
+from .typing import Scalar as Scalar
 from .typing import Weights as Weights
 from .typing import GetPoolSizeRes as GetPoolSizeRes
 from .typing import WakeUpClientsIns as WakeUpClientsIns
@@ -51,6 +52,7 @@ __all__ = [
     "parameters_to_weights",
     "ParametersRes",
     "Reconnect",
+    "Scalar",
     "Weights",
     "weights_to_parameters",
     "GetPoolSizeRes",
