@@ -218,6 +218,7 @@ class RemoteClientManager(SimpleClientManager):
         """Check if there are Ray jobs running on the VirtualClientManager
         side."""
         available = False
+        # We skip this if the VCM is in the middle of a round
         while not(available) and self.wait_until_vcm_is_available:
             available = self.vcm.is_available().status
             time.sleep(5)
@@ -225,6 +226,11 @@ class RemoteClientManager(SimpleClientManager):
         self.wait_until_vcm_is_available = False
         # print(f"OBTAINED: {status_res}")
         return available
+
+    def start_new_round(self) -> None:
+        """ Indicate that we want to wait in check_if_vcm_is_available()
+        for the VCM to be ready. """
+        self.wait_until_vcm_is_available = True
 
     def shutdown_vcm(self) -> None:
         """Tells VCM to shutdown."""
@@ -238,13 +244,16 @@ class RemoteClientManager(SimpleClientManager):
         criterion: Optional[Criterion] = None,
     ) -> List[ClientProxy]:
         """ Randomly choose client id from pool, tell VirtualClientManager
-        to wake up those clients, wait until they connect, then continue... """
+        to wake up those clients, wait until they connect, then continue...
+        Always num_clients==min_num_clients, this number is specified
+        when passing the strategy object upon server construction."""
 
-        # print(f"There are {len(self.clients)} clients connected")
         if min_num_clients is None:
+            # we'll reach this point when sampling client0 to init global weights
             min_num_clients = num_clients
 
         if self.vcm is None:
+            # wait until VCM is connected for the first time
             self.wait_for_vcm()
             self.get_virtual_pool_size()
 

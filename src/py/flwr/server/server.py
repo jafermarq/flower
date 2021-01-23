@@ -188,7 +188,7 @@ class Server:
                 _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
 
             # indicate that a new round starts so RCM should wait for VCM to be available
-            self._client_manager.wait_until_vcm_is_available = True
+            self._client_manager.start_new_round()
 
             with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
                 while len(results) < self.strategy.min_fit_clients:
@@ -197,12 +197,7 @@ class Server:
                     client_instructions = self.strategy.configure_fit(
                         rnd=rnd, weights=self.weights, client_manager=self._client_manager
                     )
-                    # log(
-                    #     DEBUG,
-                    #     "fit_round: strategy sampled %s clients (out of %s)",
-                    #     len(client_instructions),
-                    #     self._client_manager.num_available(),
-                    # )
+
                     if not client_instructions:
                         log(INFO, "fit_round: no clients sampled, cancel fit")
                         return None
