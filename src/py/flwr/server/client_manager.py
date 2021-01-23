@@ -20,6 +20,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
+from math import ceil
 
 from .client_proxy import ClientProxy
 from .virtual_client_manager_proxy import VirtualClientManagerProxy
@@ -148,24 +149,25 @@ class SimpleClientManager(ClientManager):
 
 class RemoteClientManager(SimpleClientManager):
 
-    def __init__(self) -> None:
+    def __init__(self, num_vcm: int = 1) -> None:
         super(RemoteClientManager, self).__init__()
-        self.vcm: VirtualClientManagerProxy = None
+        self.vcm: List[VirtualClientManagerProxy] = []
         self.pool_size: int
+        self.num_vcm = num_vcm
         # need to initialize with true for first client
         # woken up when server._get_initial_weights()
         self.wait_until_vcm_is_available = True
 
-    def wait_for_vcm(self, timeout: int = 86400) -> bool:
+    def wait_for_vcm(self, num_vcm: int, timeout: int = 86400) -> bool:
         """Block until a VirtualClientManager has connected.
 
         Current timeout default: 1 day.
         """
 
-        print("Waiting for VirtualClientManager to connect with server...")
+        print(f"Waiting for VirtualClientManager(s) to connect with server. Expecting {self.num_vcm}...")
         with self._cv:
             return self._cv.wait_for(
-                lambda: self.vcm is not None, timeout=timeout
+                lambda: len(self.vcm) >= num_vcm, timeout=timeout
             )
 
     def register_vcm(self, vcm: VirtualClientManagerProxy) -> bool:
@@ -175,12 +177,12 @@ class RemoteClientManager(SimpleClientManager):
             bool: Indicating if registration was successful.
         """
 
-        self.vcm = vcm
-
+        self.vcm.append(vcm)
+        print(f"RMC has {len(self.vcm)} VCM(s) connected")
         with self._cv:
             self._cv.notify_all()
 
-        print("RemoteClientManager.register_vcm: Registered a Virtual Client Manager")
+        # print("RemoteClientManager.register_vcm: Registered a Virtual Client Manager")
         return True
 
     def unregister_vcm(self) -> None:
@@ -188,6 +190,7 @@ class RemoteClientManager(SimpleClientManager):
 
         This method is idempotent.
         """
+        # TODO with multi VCM support
         del self.vcm
 
         with self._cv:
@@ -195,8 +198,19 @@ class RemoteClientManager(SimpleClientManager):
 
     def get_virtual_pool_size(self) -> None:
         """ Gets the size of the virtual pool on the VCM's side."""
-        self.pool_size = self.vcm.get_pool_size().pool_size
+
+        # use first VCM to get pool size
+        self.pool_size = self.vcm[0].get_pool_size().pool_size
         print(f"Received --> pool_size = {self.pool_size} clients.")
+
+    def _cids_list_to_string(self, cids: List[int]):
+        """Converst a list of integers into a csv string."""
+        mssg = ""
+        for n in cids[:-1]:
+            mssg += str(n)
+            mssg += ","
+        mssg += str(cids[-1])
+        return mssg
 
     def wakeup_clients(self, cids: List[int]) -> None:
         """ Tells VCM which clients to use in this round/sub-round,
@@ -204,28 +218,37 @@ class RemoteClientManager(SimpleClientManager):
         that the machine where VCM is, can't allocate that many clients at a
         given time, if this happens it will use the first N (where N is the number
         of clients that the machine can allocate), then the next N, until
-        all clients have done the specified amount of local epochs."""
+        all clients have done the specified amount of local epochs.
+        If there are"""
 
-        mssg = ""
-        for n in cids[:-1]:
-            mssg += str(n)
-            mssg += ","
-        mssg += str(cids[-1])
-        mssg_ins = WakeUpClientsIns(cids=mssg)
-        self.vcm.wakeup_clients(mssg_ins)
+        num_vcm = len(self.vcm)
+        if num_vcm > 1:
+            chunk_size = ceil(len(cids)/num_vcm)
+            # print(f"Splitting cids into {len(self.vcm)} partition of max_size: {chunk_size}...")
+            sub_cids = [cids[x:x+chunk_size] for x in range(0, len(cids), chunk_size)]
+            for i, cids in enumerate(sub_cids):
+                mssg = self._cids_list_to_string(cids)
+                mssg_ins = WakeUpClientsIns(cids=mssg)
+                self.vcm[i].wakeup_clients(mssg_ins)
+        else:
+            mssg = self._cids_list_to_string(cids)
+            mssg_ins = WakeUpClientsIns(cids=mssg)
+            self.vcm[0].wakeup_clients(mssg_ins)
 
     def check_if_vcm_is_available(self) -> bool:
         """Check if there are Ray jobs running on the VirtualClientManager
         side."""
-        available = False
+        available = [False] * len(self.vcm)
         # We skip this if the VCM is in the middle of a round
-        while not(available) and self.wait_until_vcm_is_available:
-            available = self.vcm.is_available().status
+        while not(all(available)) and self.wait_until_vcm_is_available:
+            for i, vcm in enumerate(self.vcm):
+                available[i] = vcm.is_available().status
+            # print(f"available: {available} --> {not(all(available))}")
             time.sleep(5)
 
         self.wait_until_vcm_is_available = False
         # print(f"OBTAINED: {status_res}")
-        return available
+        return all(available)
 
     def start_new_round(self) -> None:
         """ Indicate that we want to wait in check_if_vcm_is_available()
@@ -234,8 +257,9 @@ class RemoteClientManager(SimpleClientManager):
 
     def shutdown_vcm(self) -> None:
         """Tells VCM to shutdown."""
-        print("Telling VCM to shutdown...")
-        _ = self.vcm.disconnect()
+        print("Telling VCMs to shutdown...")
+        for vcm in self.vcm:
+            _ = vcm.disconnect()
 
     def sample(
         self,
@@ -248,17 +272,19 @@ class RemoteClientManager(SimpleClientManager):
         Always num_clients==min_num_clients, this number is specified
         when passing the strategy object upon server construction."""
 
+        # print(f"sample(self, {num_clients}, {min_num_clients})")
         if min_num_clients is None:
             # we'll reach this point when sampling client0 to init global weights
             min_num_clients = num_clients
 
-        if self.vcm is None:
-            # wait until VCM is connected for the first time
-            self.wait_for_vcm()
+        if not(self.vcm):
+            # wait until VCMs are connected for the first time
+            self.wait_for_vcm(self.num_vcm)
             self.get_virtual_pool_size()
 
         # Take `min_num_clients` from total number of clients in pool
         cids = random.sample(list(range(self.pool_size)), min_num_clients)
+        # print(f"cids: {cids}")
 
         # Wakeup clients in cid in cids
         if self.check_if_vcm_is_available():
@@ -267,19 +293,21 @@ class RemoteClientManager(SimpleClientManager):
         # Block until clients managed by VCM are instantiated,
         # allocated, warmedup and connected to the server.
 
-        wait = True
-        clients_wait_for = 0
-        while wait:
-            # ask VCM whether clients are ready and how many are online
-            res = self.vcm.is_ready_for_sampling()
-            # print(f"client_manager got: {res}")
-            wait = res.wait
-            clients_wait_for = res.num_clients
+        wait = [True] * len(self.vcm)
+        clients_wait_for = [0] * len(self.vcm)
+        while all(wait):
+            for i, vcm in enumerate(self.vcm):
+                # ask VCM whether clients are ready and how many are online
+                res = vcm.is_ready_for_sampling()
+                # print(f"client_manager got: {res}")
+                wait[i] = res.wait
+                clients_wait_for[i] = res.num_clients
             time.sleep(2)
 
         # ensure the number of clients that VCM said are online
         # are indeed connected
-        self.wait_for(clients_wait_for)
+        # print(f"Waiting for #clients from VCMs to be online: {clients_wait_for}")
+        self.wait_for(sum(clients_wait_for))
 
         # Sample clients which meet the criterion
         available_cids = list(self.clients)

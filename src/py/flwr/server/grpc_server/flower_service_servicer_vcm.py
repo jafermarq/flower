@@ -45,7 +45,7 @@ def register_virtual_client_manager(
 ) -> bool:
     """Try registering GrpcVirtualClientManagerProxy with RemoteClientManager."""
     is_success = client_manager.register_vcm(vcm)
-    print("flower_service_servicer.register_virtual_client_manager() ...")
+    print("flower_service_servicer_vcm.register_virtual_client_manager() ...")
     if is_success:
 
         def rpc_termination_callback() -> None:
