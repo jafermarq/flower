@@ -238,6 +238,11 @@ class RemoteClientManager(SimpleClientManager):
     def check_if_vcm_is_available(self) -> bool:
         """Check if there are Ray jobs running on the VirtualClientManager
         side."""
+        # TODO: 
+        # ! In theory this method can be completely replaced with
+        # ! return wait_until_vcm_is_available. However, for this to work
+        # ! We'll need to change teh way we genereate the global weights
+        # ! At the beginning of the experiment. We leave this for now
         available = [False] * len(self.vcm)
         # We skip this if the VCM is in the middle of a round
         while not(all(available)) and self.wait_until_vcm_is_available:
@@ -282,12 +287,10 @@ class RemoteClientManager(SimpleClientManager):
             self.wait_for_vcm(self.num_vcm)
             self.get_virtual_pool_size()
 
-        # Take `min_num_clients` from total number of clients in pool
-        cids = random.sample(list(range(self.pool_size)), min_num_clients)
-        # print(f"cids: {cids}")
-
         # Wakeup clients in cid in cids
         if self.check_if_vcm_is_available():
+            # Take `min_num_clients` from total number of clients in pool
+            cids = random.sample(list(range(self.pool_size)), min_num_clients)
             self.wakeup_clients(cids)
 
         # Block until clients managed by VCM are instantiated,
@@ -299,24 +302,21 @@ class RemoteClientManager(SimpleClientManager):
             for i, vcm in enumerate(self.vcm):
                 # ask VCM whether clients are ready and how many are online
                 res = vcm.is_ready_for_sampling()
-                # print(f"client_manager got: {res}")
                 wait[i] = res.wait
                 clients_wait_for[i] = res.num_clients
             time.sleep(2)
 
         # ensure the number of clients that VCM said are online
         # are indeed connected
-        # print(f"Waiting for #clients from VCMs to be online: {clients_wait_for}")
         self.wait_for(sum(clients_wait_for))
 
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
-        # print(f'available_cids: {available_cids}')
         if criterion is not None:
+            # TODO: this needs to be revisited (is it even ever used?)
+            print("> Revisit the use of `criterion` for RemoteClientManager")
             available_cids = [
                 cid for cid in available_cids if criterion.select(self.clients[cid])
             ]
 
-        num_clients = min(len(available_cids), num_clients)
-        sampled_cids = random.sample(available_cids, num_clients)
-        return [self.clients[cid] for cid in sampled_cids]
+        return [self.clients[cid] for cid in available_cids]
