@@ -52,7 +52,8 @@ def set_strategy(strategy: Optional[Strategy]) -> Strategy:
 
 
 def func_to_method(f, obj):
-    return f.__get__(obj, type(obj)) if f else lambda: None
+    """ Makes function f be an obj's method. """
+    return f.__get__(obj, type(obj))
 
 
 class Server:
@@ -60,9 +61,9 @@ class Server:
 
     def __init__(
         self, client_manager: ClientManager,
+        on_init_fn: Optional[Callable[[None], None]],
+        on_round_end_fn: Optional[Callable[[Dict], None]],
         strategy: Optional[Strategy] = None,
-        on_init_fn: Optional[Callable[[None], None]] = None,
-        on_round_end_fn: Optional[Callable[[Dict], None]] = None,
     ) -> None:
         self._client_manager: ClientManager = client_manager
         self.weights: Weights = []
