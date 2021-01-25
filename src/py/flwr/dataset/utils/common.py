@@ -395,8 +395,20 @@ def create_lda_partitions(
     list_samples_per_class = split_array_at_indices(x, start_indices)
 
     if dirichlet_dist is None:
+
+        # count the number of data in each class
+        count = np.zeros(classes.size)
+        for item in y:
+            count[item] += 1
+
+        # get ratio of examples per class
+        ratio = count / len(x)
+
+        # compute per-class alpha
+        alpha = concentration * ratio * classes.size
+
         dirichlet_dist = np.random.default_rng().dirichlet(
-            alpha=classes.size * [concentration], size=num_partitions
+            alpha=alpha, size=num_partitions
         )
 
     if dirichlet_dist.size != 0:
