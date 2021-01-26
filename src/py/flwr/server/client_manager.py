@@ -177,6 +177,10 @@ class RemoteClientManager(SimpleClientManager):
             bool: Indicating if registration was successful.
         """
 
+        if self.num_vcm == len(self.vcm):
+            print(f"RCM not accepting more VCMs, {len(self.vcm)}/{self.num_vcm} already connected")
+            return False
+
         self.vcm.append(vcm)
         print(f"RMC has {len(self.vcm)} VCM(s) connected")
         with self._cv:
