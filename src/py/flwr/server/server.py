@@ -70,10 +70,10 @@ class Server:
         self.strategy: Strategy = set_strategy(strategy)
 
         # make these actual class methods (if defined)
-        self.on_init_fn = func_to_method(on_init_fn, self)
-        self.on_round_end_fn = func_to_method(on_round_end_fn, self)
+        self.on_init = func_to_method(on_init_fn, self)
+        self.on_round_end = func_to_method(on_round_end_fn, self)
 
-        self.on_init_fn()
+        self.on_init()
 
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
@@ -110,13 +110,14 @@ class Server:
             res_cen = self.strategy.evaluate(weights=self.weights)
             if res_cen is not None:
                 loss_cen, acc_cen = res_cen
+                t_round = timeit.default_timer() - start_time
                 log(
                     INFO,
                     "fit progress: (%s, %s, %s, %s)",
                     current_round,
                     loss_cen,
                     acc_cen,
-                    timeit.default_timer() - start_time,
+                    t_round,
                 )
                 history.add_loss_centralized(rnd=current_round, loss=loss_cen)
                 history.add_accuracy_centralized(rnd=current_round, acc=acc_cen)
@@ -130,8 +131,10 @@ class Server:
                 )
 
             # Round ended, run post round stages
-            args = {'current_round': current_round}
-            self.on_round_end_fn(args)
+            args = {'current_round': current_round, 'acc_cen': acc_cen,
+                    'loss_cen': loss_cen, 't_round': t_round}
+
+            self.on_round_end(args)
 
         # Bookkeeping
         end_time = timeit.default_timer()
