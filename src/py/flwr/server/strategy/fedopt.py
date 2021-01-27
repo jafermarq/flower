@@ -14,14 +14,15 @@
 # ==============================================================================
 """Adaptive Federated Optimization (FedOpt) [Reddi et al., 2020] abstract
 strategy.
-
 Paper: https://arxiv.org/abs/2003.00295
 """
 
 
-from typing import Callable, Dict, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
-from flwr.common import Scalar, Weights
+from flwr.common import FitIns, Scalar, Weights
+from flwr.server.client_manager import ClientManager
+from flwr.server.client_proxy import ClientProxy
 
 from .fedavg import FedAvg
 
@@ -48,9 +49,7 @@ class FedOpt(FedAvg):
         tau: float = 1e-9,
     ) -> None:
         """Federated Optim strategy interface.
-
         Implementation based on https://arxiv.org/abs/2003.00295
-
         Args:
             fraction_fit (float, optional): Fraction of clients used during
                 training. Defaults to 0.1.
@@ -95,3 +94,12 @@ class FedOpt(FedAvg):
     def __repr__(self) -> str:
         rep = f"FedOpt(accept_failures={self.accept_failures})"
         return rep
+
+    def configure_fit(
+        self, rnd: int, weights: Weights, client_manager: ClientManager
+    ) -> List[Tuple[ClientProxy, FitIns]]:
+        """Save weights locally and configure the next round of training."""
+        self.current_weights = weights
+
+        # Return client/config pairs
+        return super().configure_fit(rnd, weights, client_manager)
