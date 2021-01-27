@@ -154,9 +154,8 @@ class RemoteClientManager(SimpleClientManager):
         self.vcm: List[VirtualClientManagerProxy] = []
         self.pool_size: int
         self.num_vcm = num_vcm
-        # need to initialize with true for first client
-        # woken up when server._get_initial_weights()
-        self.wait_until_vcm_is_available = True
+        self.wait_until_vcm_is_available: bool = True
+        self.vcm_failure: bool = False
 
     def wait_for_vcm(self, num_vcm: int, timeout: int = 86400) -> bool:
         """Block until a VirtualClientManager has connected.
@@ -181,22 +180,28 @@ class RemoteClientManager(SimpleClientManager):
             print(f"RCM not accepting more VCMs, {len(self.vcm)}/{self.num_vcm} already connected")
             return False
 
+        # add VCM to list
         self.vcm.append(vcm)
-        print(f"RMC has {len(self.vcm)} VCM(s) connected")
+        print(f"RMC has {len(self.vcm)}/{self.num_vcm} VCM(s) connected")
+
         with self._cv:
             self._cv.notify_all()
 
         # print("RemoteClientManager.register_vcm: Registered a Virtual Client Manager")
         return True
 
-    def unregister_vcm(self) -> None:
+    def unregister_vcm(self, vcm: VirtualClientManagerProxy) -> None:
         """Unregister Flower VirtualClientManager instance.
 
         This method is idempotent.
         """
-        # TODO with multi VCM support
-        del self.vcm
+        # TODO: when a VCM goes down we should: (1) tell remaining VCMs to reset, (2) end round
+        idx = self.vcm.index(vcm)
+        print(f"Unregistering the {idx}-th VCM")
+        self.vcm.remove(vcm)
+        self.vcm_failure = True
 
+        print(f"RMC has {len(self.vcm)}/{self.num_vcm} VCM(s) connected")
         with self._cv:
             self._cv.notify_all()
 
@@ -242,11 +247,7 @@ class RemoteClientManager(SimpleClientManager):
     def check_if_vcm_is_available(self) -> bool:
         """Check if there are Ray jobs running on the VirtualClientManager
         side."""
-        # TODO: 
-        # ! In theory this method can be completely replaced with
-        # ! return wait_until_vcm_is_available. However, for this to work
-        # ! We'll need to change teh way we genereate the global weights
-        # ! At the beginning of the experiment. We leave this for now
+        # TODO: Can we simplify this?
         available = [False] * len(self.vcm)
         # We skip this if the VCM is in the middle of a round
         while not(all(available)) and self.wait_until_vcm_is_available:
@@ -263,6 +264,7 @@ class RemoteClientManager(SimpleClientManager):
         """ Indicate that we want to wait in check_if_vcm_is_available()
         for the VCM to be ready. """
         self.wait_until_vcm_is_available = True
+        self.vcm_failure = False
 
     def shutdown_vcm(self) -> None:
         """Tells VCM to shutdown."""

@@ -49,7 +49,7 @@ def register_virtual_client_manager(
 
         def rpc_termination_callback() -> None:
             vcm.bridge.close()
-            client_manager.unregister_vcm()
+            client_manager.unregister_vcm(vcm)
 
         context.add_callback(rpc_termination_callback)
 

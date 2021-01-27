@@ -49,7 +49,7 @@ class FedAdagrad(FedOpt):
         on_fit_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
         on_evaluate_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
         accept_failures: bool = True,
-        current_weights: Weights,
+        current_weights: Weights = None,
         eta: float = 1e-1,
         eta_l: float = 1e-1,
         tau: float = 1e-9,
