@@ -29,7 +29,6 @@ from flwr.common import (
     FitRes,
     Reconnect,
     Weights,
-    parameters_to_weights,
 )
 from flwr.common.logger import log
 from flwr.server.client_manager import ClientManager, RemoteClientManager
@@ -63,11 +62,16 @@ class Server:
         self, client_manager: ClientManager,
         on_init_fn: Optional[Callable[[None], None]],
         on_round_end_fn: Optional[Callable[[Dict], None]],
+        init_global_model_fn: Optional[Callable[[None], Weights]],
         strategy: Optional[Strategy] = None,
     ) -> None:
         self._client_manager: ClientManager = client_manager
         self.weights: Weights = []
         self.strategy: Strategy = set_strategy(strategy)
+        self.starting_round = 1
+
+        # init global model
+        self.weights = init_global_model_fn()
 
         # make these actual class methods (if defined)
         self.on_init = func_to_method(on_init_fn, self)
@@ -83,8 +87,6 @@ class Server:
     def fit(self, num_rounds: int) -> History:
         """Run federated averaging for a number of rounds."""
         history = History()
-        # Initialize weights by asking one client to return theirs
-        self.weights = self._get_initial_weights()
         res = self.strategy.evaluate(weights=self.weights)
         if res is not None:
             log(
@@ -100,7 +102,7 @@ class Server:
         log(INFO, "[TIME] FL starting")
         start_time = timeit.default_timer()
 
-        for current_round in range(1, num_rounds + 1):
+        for current_round in range(self.starting_round, num_rounds + 1):
             # Train model and replace previous global model
             weights_prime = self.fit_round(rnd=current_round)
             if weights_prime is not None:
@@ -132,7 +134,8 @@ class Server:
 
             # Round ended, run post round stages
             args = {'current_round': current_round, 'acc_cen': acc_cen,
-                    'loss_cen': loss_cen, 't_round': t_round}
+                    'loss_cen': loss_cen, 'weights': self.weights,
+                    't_round': t_round}
 
             self.on_round_end(args)
 
@@ -183,11 +186,6 @@ class Server:
         if isinstance(self._client_manager, RemoteClientManager):
             results = []
             failures = []
-
-            # if first round, shutdown client wokeup for `_get_initial_weights()`
-            if rnd == 1:
-                all_clients = self._client_manager.all()
-                _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
 
             # indicate that a new round starts so RCM should wait for VCM to be available
             self._client_manager.start_new_round()
@@ -248,12 +246,6 @@ class Server:
         """Send shutdown signal to all clients."""
         all_clients = self._client_manager.all()
         _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
-
-    def _get_initial_weights(self) -> Weights:
-        """Get initial weights from one of the available clients."""
-        random_client = self._client_manager.sample(1)[0]
-        parameters_res = random_client.get_parameters()
-        return parameters_to_weights(parameters_res.parameters)
 
 
 def shutdown(clients: List[ClientProxy]) -> ReconnectResultsAndFailures:
