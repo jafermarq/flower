@@ -87,16 +87,16 @@ class Server:
     def fit(self, num_rounds: int) -> History:
         """Run federated averaging for a number of rounds."""
         history = History()
-        res = self.strategy.evaluate(weights=self.weights)
-        if res is not None:
-            log(
-                INFO,
-                "initial weights (loss/accuracy): %s, %s",
-                res[0],
-                res[1],
-            )
-            history.add_loss_centralized(rnd=0, loss=res[0])
-            history.add_accuracy_centralized(rnd=0, acc=res[1])
+        # res = self.strategy.evaluate(weights=self.weights)
+        # if res is not None:
+        #     log(
+        #         INFO,
+        #         "initial weights (loss/accuracy): %s, %s",
+        #         res[0],
+        #         res[1],
+        #     )
+        #     history.add_loss_centralized(rnd=0, loss=res[0])
+        #     history.add_accuracy_centralized(rnd=0, acc=res[1])
 
         # Run federated learning for num_rounds
         log(INFO, "[TIME] FL starting")
