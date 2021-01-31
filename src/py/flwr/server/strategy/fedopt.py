@@ -20,7 +20,9 @@ Paper: https://arxiv.org/abs/2003.00295
 
 from typing import Callable, Dict, List, Optional, Tuple
 
-from flwr.common import FitIns, Scalar, Weights
+import numpy as np
+
+from flwr.common import FitRes, FitIns, Scalar, Weights, parameters_to_weights
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 
@@ -87,13 +89,50 @@ class FedOpt(FedAvg):
             accept_failures,
         )
         self.current_weights = current_weights
+        self.delta_t: Optional[Weights] = None
+        self.v_t: Optional[Weights] = None
         self.eta = eta
         self.eta_l = eta_l
         self.tau = tau
+        self.beta_1 = None
 
     def __repr__(self) -> str:
         rep = f"FedOpt(accept_failures={self.accept_failures})"
         return rep
+
+    def aggregate_fit(
+        self,
+        rnd: int,
+        results: List[Tuple[ClientProxy, FitRes]],
+        failures: List[BaseException],
+    ) -> Optional[Weights]:
+
+        # convert message
+        results = [
+                    (parameters_to_weights(fit_res.parameters), fit_res.num_examples)
+                    for client, fit_res in results
+                ]
+
+        ## compute all delta_i_t (line 9 Alg2)
+        delta_i_t = [[layer_w - self.current_weights[i] for i, layer_w in enumerate(client_res)] for client_res, _ in results]
+
+        ## compute delta_t: (1/S)*sum(delta_i_t)
+        S = len(results) # total number of clients that participated
+        delta_t = delta_i_t[0]
+        for d_i_t in delta_i_t[1:]:
+            delta_t = [sum(layer) for layer in zip(delta_t, d_i_t)]
+        delta_t = [d/S for d in delta_t]
+
+        # Delta_t in Line 10 Eq2
+        if self.delta_t is None:
+            self.delta_t = [np.zeros_like(subset_weights) for subset_weights in delta_t]
+
+        # V_t in Line 11 Eq2
+        if self.v_t is None:
+            self.v_t = [np.zeros_like(subset_weights) for subset_weights in delta_t]
+
+        # Delta_t in Line 10 Eq2
+        self.delta_t = [self.beta_1*self.delta_t[i] + (1.0-self.beta_1)*res_layer for i, res_layer in enumerate(delta_t)] 
 
     def configure_fit(
         self, rnd: int, weights: Weights, client_manager: ClientManager
