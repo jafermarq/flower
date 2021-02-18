@@ -109,28 +109,30 @@ class Server:
                 self.weights = weights_prime
 
             # Evaluate model using strategy implementation
-            res_cen = self.strategy.evaluate(weights=self.weights)
-            if res_cen is not None:
-                loss_cen, acc_cen = res_cen
-                t_round = timeit.default_timer() - start_time
-                log(
-                    INFO,
-                    "fit progress: (%s, %s, %s, %s)",
-                    current_round,
-                    loss_cen,
-                    acc_cen,
-                    t_round,
-                )
-                history.add_loss_centralized(rnd=current_round, loss=loss_cen)
-                history.add_accuracy_centralized(rnd=current_round, acc=acc_cen)
-
-            # Evaluate model on a sample of available clients
-            res_fed = self.evaluate(rnd=current_round)
-            if res_fed is not None and res_fed[0] is not None:
-                loss_fed, _ = res_fed
-                history.add_loss_distributed(
-                    rnd=current_round, loss=cast(float, loss_fed)
-                )
+            if self.strategy.eval_fn is not None:
+                # centralized evaluation
+                res_cen = self.strategy.evaluate(weights=self.weights)
+                if res_cen is not None:
+                    loss_cen, acc_cen = res_cen
+                    t_round = timeit.default_timer() - start_time
+                    log(
+                        INFO,
+                        "fit progress: (%s, %s, %s, %s)",
+                        current_round,
+                        loss_cen,
+                        acc_cen,
+                        t_round,
+                    )
+                    history.add_loss_centralized(rnd=current_round, loss=loss_cen)
+                    history.add_accuracy_centralized(rnd=current_round, acc=acc_cen)
+            else:
+                # evaluation on clients
+                res_fed = self.evaluate(rnd=current_round)
+                if res_fed is not None and res_fed[0] is not None:
+                    loss_fed, _ = res_fed
+                    history.add_loss_distributed(
+                        rnd=current_round, loss=cast(float, loss_fed)
+                    )
 
             # Round ended, run post round stages
             args = {'current_round': current_round, 'acc_cen': acc_cen,
@@ -154,66 +156,80 @@ class Server:
         self, rnd: int
     ) -> Optional[Tuple[Optional[float], EvaluateResultsAndFailures]]:
         """Validate current global model on a number of clients."""
-        # Get clients and their respective instructions from strategy
-        client_instructions = self.strategy.configure_evaluate(
-            rnd=rnd, weights=self.weights, client_manager=self._client_manager
-        )
-        if not client_instructions:
-            log(INFO, "evaluate: no clients sampled, cancel federated evaluation")
-            return None
-        log(
-            DEBUG,
-            "evaluate: strategy sampled %s clients",
-            len(client_instructions),
-        )
 
-        # Evaluate current global weights on those clients
-        results_and_failures = evaluate_clients(client_instructions)
-        results, failures = results_and_failures
-        log(
-            DEBUG,
-            "evaluate received %s results and %s failures",
-            len(results),
-            len(failures),
-        )
+        # # ! this can certainly be done in a nicer way...
+        if isinstance(self._client_manager, RemoteClientManager):
+
+            results, failures = self._round_with_rcm(self.strategy.configure_evaluate, evaluate_clients, rnd)
+
+        else:
+            # Get clients and their respective instructions from strategy
+            client_instructions = self.strategy.configure_evaluate(
+                rnd=rnd, weights=self.weights, client_manager=self._client_manager
+            )
+            if not client_instructions:
+                log(INFO, "evaluate: no clients sampled, cancel federated evaluation")
+                return None
+            log(
+                DEBUG,
+                "evaluate: strategy sampled %s clients",
+                len(client_instructions),
+            )
+
+            # Evaluate current global weights on those clients
+            results_and_failures = evaluate_clients(client_instructions)
+            results, failures = results_and_failures
+            log(
+                DEBUG,
+                "evaluate received %s results and %s failures",
+                len(results),
+                len(failures),
+            )
         # Aggregate the evaluation results
         loss_aggregated = self.strategy.aggregate_evaluate(rnd, results, failures)
         return loss_aggregated, results_and_failures
 
+    def _round_with_rcm(self, get_instructions_fn, task_fn, rnd):
+
+        results = []
+        failures = []
+
+        # indicate that a new round starts so RCM should wait for VCM to be available
+        self._client_manager.start_new_round()
+
+        with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
+            while len(results) < self.strategy.min_fit_clients:
+
+                # Get clients and their respective instructions from strategy
+                client_instructions = get_instructions_fn(rnd=rnd, weights=self.weights,
+                                                            client_manager=self._client_manager)
+                if not client_instructions:
+                    log(INFO, "fit_round: no clients sampled, cancel fit")
+                    return None
+
+                # obtain results
+                results_, failures_ = task_fn(client_instructions)
+
+                # add to lists
+                results += results_
+                failures += failures_
+
+                # shut down clients
+                all_clients = self._client_manager.all()
+                dis, err = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
+                t.set_postfix({'results': f"{len(results)}", 'failures':f"{len(failures)}"})
+                t.update(len(results_))
+
+        return results, failures
+
     def fit_round(self, rnd: int) -> Optional[Weights]:
         """Perform a single round of federated averaging."""
-        # ! this can certainly be done in a nicer way...
+
+        # # ! this can certainly be done in a nicer way...
         if isinstance(self._client_manager, RemoteClientManager):
-            results = []
-            failures = []
 
-            # indicate that a new round starts so RCM should wait for VCM to be available
-            self._client_manager.start_new_round()
+            results, failures = self._round_with_rcm(self.strategy.configure_fit, fit_clients, rnd)
 
-            with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
-                while len(results) < self.strategy.min_fit_clients:
-
-                    # Get clients and their respective instructions from strategy
-                    client_instructions = self.strategy.configure_fit(
-                        rnd=rnd, weights=self.weights, client_manager=self._client_manager
-                    )
-
-                    if not client_instructions:
-                        log(INFO, "fit_round: no clients sampled, cancel fit")
-                        return None
-
-                    # obtain results
-                    results_, failures_ = fit_clients(client_instructions)
-
-                    # add to lists
-                    results += results_
-                    failures += failures_
-
-                    # shut down clients
-                    all_clients = self._client_manager.all()
-                    _ = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
-                    t.set_postfix({'results': f"{len(results)}", 'failures':f"{len(failures)}"})
-                    t.update(len(results_))
         else:
             # Get clients and their respective instructions from strategy
             client_instructions = self.strategy.configure_fit(
