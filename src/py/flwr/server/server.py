@@ -117,6 +117,7 @@ class Server:
                 res_cen = self.strategy.evaluate(weights=self.weights)
                 if res_cen is not None:
                     loss_cen, acc_cen = res_cen
+                    metrics = {'acc_cen': acc_cen, 'loss_cen': loss_cen}
                     t_round = timeit.default_timer() - start_time
                     log(
                         INFO,
@@ -133,14 +134,22 @@ class Server:
                 res_fed = self.evaluate(rnd=current_round)
                 if res_fed is not None and res_fed[0] is not None:
                     loss_fed, _ = res_fed
+                    metrics = {'acc_fed': None, 'loss_fed': loss_fed}
+                    t_round = timeit.default_timer() - start_time
+                    log(
+                        INFO,
+                        "eval(fed): (%s, %s, %s)",
+                        current_round,
+                        loss_fed,
+                        t_round,
+                    )
                     history.add_loss_distributed(
                         rnd=current_round, loss=cast(float, loss_fed)
                     )
 
             # Round ended, run post round stages
-            args = {'current_round': current_round, 'acc_cen': acc_cen,
-                    'loss_cen': loss_cen, 'weights': self.weights,
-                    't_round': t_round}
+            args = {'current_round': current_round, **metrics,
+                    'weights': self.weights, 't_round': t_round}
 
             self.on_round_end(args)
 
@@ -163,8 +172,8 @@ class Server:
         # # ! this can certainly be done in a nicer way...
         if isinstance(self._client_manager, RemoteClientManager):
 
-            results, failures = self._round_with_rcm(self.strategy.configure_evaluate, evaluate_clients, rnd)
-
+            results_and_failures = self._round_with_rcm(self.strategy.configure_evaluate, evaluate_clients, rnd)
+            results, failures = results_and_failures
         else:
             # Get clients and their respective instructions from strategy
             client_instructions = self.strategy.configure_evaluate(
@@ -207,12 +216,14 @@ class Server:
         # easy to understand and revisit in the future if necessary.
         if task_fn == fit_clients:
             self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.train_ids)
+            tqdm_tile = f'Round #{rnd}'
         elif task_fn == evaluate_clients:
             self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
+            tqdm_tile = "Eval"
         else:
             raise NotImplementedError()
 
-        with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
+        with tqdm(total=self.strategy.min_fit_clients, desc=tqdm_tile) as t:
             while len(results) < self.strategy.min_fit_clients:
 
                 # Get clients and their respective instructions from strategy
