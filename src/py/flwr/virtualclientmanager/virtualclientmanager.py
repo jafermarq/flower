@@ -29,12 +29,11 @@ class VirtualClientManager(ABC):
     """Abstract base class for Flower virtual client managers."""
 
     def __init__(self):
-        self.pool_size = -1
         self.pending_jobs = False
 
     @abstractmethod
-    def get_pool_size(self) -> GetPoolSizeRes:
-        """Return the size of virtual pool of clients."""
+    def get_pool_ids(self) -> GetPoolSizeRes:
+        """Returns the list of client ids to be used for training/val/test."""
 
     @abstractmethod
     def wakeup_clients(self, ins: WakeUpClientsIns) -> None:

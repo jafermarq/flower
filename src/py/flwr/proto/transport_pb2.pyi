@@ -7,6 +7,7 @@ from google.protobuf.descriptor import (
 )
 
 from google.protobuf.internal.containers import (
+    RepeatedCompositeFieldContainer as google___protobuf___internal___containers___RepeatedCompositeFieldContainer,
     RepeatedScalarFieldContainer as google___protobuf___internal___containers___RepeatedScalarFieldContainer,
 )
 
@@ -315,13 +316,23 @@ class VirtualClientManagerMessage(google___protobuf___message___Message):
     DESCRIPTOR: google___protobuf___descriptor___Descriptor = ...
     class GetPoolSizeRes(google___protobuf___message___Message):
         DESCRIPTOR: google___protobuf___descriptor___Descriptor = ...
-        pool_size: builtin___int = ...
+
+        @property
+        def train_ids(self) -> google___protobuf___internal___containers___RepeatedCompositeFieldContainer[type___Scalar]: ...
+
+        @property
+        def val_ids(self) -> google___protobuf___internal___containers___RepeatedCompositeFieldContainer[type___Scalar]: ...
+
+        @property
+        def test_ids(self) -> google___protobuf___internal___containers___RepeatedCompositeFieldContainer[type___Scalar]: ...
 
         def __init__(self,
             *,
-            pool_size : typing___Optional[builtin___int] = None,
+            train_ids : typing___Optional[typing___Iterable[type___Scalar]] = None,
+            val_ids : typing___Optional[typing___Iterable[type___Scalar]] = None,
+            test_ids : typing___Optional[typing___Iterable[type___Scalar]] = None,
             ) -> None: ...
-        def ClearField(self, field_name: typing_extensions___Literal[u"pool_size",b"pool_size"]) -> None: ...
+        def ClearField(self, field_name: typing_extensions___Literal[u"test_ids",b"test_ids",u"train_ids",b"train_ids",u"val_ids",b"val_ids"]) -> None: ...
     type___GetPoolSizeRes = GetPoolSizeRes
 
     class WakeUpClientsRes(google___protobuf___message___Message):

@@ -25,7 +25,7 @@ from math import ceil
 from .client_proxy import ClientProxy
 from .virtual_client_manager_proxy import VirtualClientManagerProxy
 from .criterion import Criterion
-from flwr.common import WakeUpClientsIns
+from flwr.common import WakeUpClientsIns, GetPoolSizeRes
 
 
 class ClientManager(ABC):
@@ -152,7 +152,8 @@ class RemoteClientManager(SimpleClientManager):
     def __init__(self, num_vcm: int = 1) -> None:
         super(RemoteClientManager, self).__init__()
         self.vcm: List[VirtualClientManagerProxy] = []
-        self.pool_size: int
+        self.pool_ids: GetPoolSizeRes
+        self.ids_to_use = None
         self.num_vcm = num_vcm
         self.wait_until_vcm_is_available: bool = True
         self.vcm_failure: bool = False
@@ -205,12 +206,16 @@ class RemoteClientManager(SimpleClientManager):
         with self._cv:
             self._cv.notify_all()
 
-    def get_virtual_pool_size(self) -> None:
-        """ Gets the size of the virtual pool on the VCM's side."""
+    def get_virtual_pool_ids(self) -> None:
+        """ Gets the ids of clients in the virtual pool on the VCM's side."""
 
         # use first VCM to get pool size
-        self.pool_size = self.vcm[0].get_pool_size().pool_size
-        print(f"Received --> pool_size = {self.pool_size} clients.")
+        self.pool_ids = self.vcm[0].get_pool_ids()
+        train_ids_len = len(self.pool_ids.train_ids)
+        val_ids_len = None if self.pool_ids.val_ids is None else len(self.pool_ids.val_ids)
+        test_ids_len = None if self.pool_ids.test_ids is None else len(self.pool_ids.test_ids)
+        print(f"Received --> pool_ids = List[train={train_ids_len}," +
+              f"val={val_ids_len},test={test_ids_len}] IDs.")
 
     def _cids_list_to_string(self, cids: List[int]):
         """Converst a list of integers into a csv string."""
@@ -266,11 +271,24 @@ class RemoteClientManager(SimpleClientManager):
         self.wait_until_vcm_is_available = True
         self.vcm_failure = False
 
+    def update_id_list_to_use(self, ids: List[int]) -> None:
+        """ Updates the list of client ids to wake up ahead of a call to
+        sample(). For example, in some scenarios we might have some clients
+        to be exclusivelly used for train or validation. """
+        self.ids_to_use = ids
+
     def shutdown_vcm(self) -> None:
         """Tells VCM to shutdown."""
         print("Telling VCMs to shutdown...")
         for vcm in self.vcm:
             _ = vcm.disconnect()
+
+    def init_upon_vcm_connects(self) -> None:
+        """Waits for VCMs to connect with Server/RCM."""
+        if not(self.vcm):
+            # wait until VCMs are connected for the first time
+            self.wait_for_vcm(self.num_vcm)
+            self.get_virtual_pool_ids()
 
     def sample(
         self,
@@ -289,14 +307,15 @@ class RemoteClientManager(SimpleClientManager):
             min_num_clients = num_clients
 
         if not(self.vcm):
+            # TODO: what's the best way to implement fault tolerance?
             # wait until VCMs are connected for the first time
             self.wait_for_vcm(self.num_vcm)
-            self.get_virtual_pool_size()
+            self.get_virtual_pool_ids()
 
         # Wakeup clients in cid in cids
         if self.check_if_vcm_is_available():
             # Take `min_num_clients` from total number of clients in pool
-            cids = random.sample(list(range(self.pool_size)), min_num_clients)
+            cids = random.sample(self.ids_to_use, min_num_clients)
             self.wakeup_clients(cids)
 
         # Block until clients managed by VCM are instantiated,

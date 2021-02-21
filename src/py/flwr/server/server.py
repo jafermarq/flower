@@ -102,6 +102,9 @@ class Server:
         log(INFO, "[TIME] FL starting")
         start_time = timeit.default_timer()
 
+        # wait until VCM(s) have connected
+        self._client_manager.init_upon_vcm_connects()
+
         for current_round in range(self.starting_round, num_rounds + 1):
             # Train model and replace previous global model
             weights_prime = self.fit_round(rnd=current_round)
@@ -196,6 +199,18 @@ class Server:
 
         # indicate that a new round starts so RCM should wait for VCM to be available
         self._client_manager.start_new_round()
+
+        # determine what task are we donig (fit/evaluate) and notivy the RCM. This is
+        # needed so the RCM samples from the correct list of client_ids for training and
+        # for evaluation respectively.
+        # this might seem like too much code for this purpose, we do it in this way so it's
+        # easy to understand and revisit in the future if necessary.
+        if task_fn == fit_clients:
+            self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.train_ids)
+        elif task_fn == evaluate_clients:
+            self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
+        else:
+            raise NotImplementedError()
 
         with tqdm(total=self.strategy.min_fit_clients, desc=f'Round #{rnd}') as t:
             while len(results) < self.strategy.min_fit_clients:

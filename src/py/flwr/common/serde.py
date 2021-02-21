@@ -199,14 +199,23 @@ def get_pool_size_to_proto() -> RemoteClientManagerMessage.GetPoolSize:
 
 def get_pool_size_res_to_proto(res: typing.GetPoolSizeRes) -> VirtualClientManagerMessage.GetPoolSizeRes:
 
+    train_ids_proto = scalar_list_to_proto(res.train_ids)
+    val_ids_proto = None if res.val_ids is None else scalar_list_to_proto(res.val_ids)
+    test_ids_proto = None if res.test_ids is None else scalar_list_to_proto(res.test_ids)
     # print(f"serde.get_pool_size_res_to_proto -> res: {res}")
-    return VirtualClientManagerMessage.GetPoolSizeRes(pool_size=res)
+    return VirtualClientManagerMessage.GetPoolSizeRes(train_ids=train_ids_proto,
+                                                      val_ids=val_ids_proto,
+                                                      test_ids=test_ids_proto)
 
 
 def get_pool_size_res_from_proto(msg: VirtualClientManagerMessage.GetPoolSizeRes) -> typing.GetPoolSizeRes:
     # print(f"get_pool_size_res_from_proto: {msg}")
-    poolsize = msg.pool_size
-    return typing.GetPoolSizeRes(pool_size=poolsize)
+    train_ids = scalar_list_from_proto(msg.train_ids)
+    val_ids = None if msg.val_ids is None else scalar_list_from_proto(msg.val_ids)
+    test_ids = None if msg.test_ids is None else scalar_list_from_proto(msg.test_ids)
+    return typing.GetPoolSizeRes(train_ids=train_ids,
+                                 val_ids=val_ids,
+                                 test_ids=test_ids)
 
 
 # === WakeUpClients messages ===
@@ -320,3 +329,11 @@ def scalar_from_proto(scalar_msg: Scalar) -> typing.Scalar:
     """Deserialize... ."""
     scalar = getattr(scalar_msg, scalar_msg.WhichOneof("scalar"))
     return cast(typing.Scalar, scalar)
+
+
+def scalar_list_to_proto(scalar_list: List[typing.Scalar]) -> List[Scalar]:
+    return [scalar_to_proto(s) for s in scalar_list]
+
+
+def scalar_list_from_proto(proto_scalar_list: List[Scalar]) -> List[typing.Scalar]:
+    return [scalar_from_proto(ps) for ps in proto_scalar_list]

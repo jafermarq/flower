@@ -101,7 +101,9 @@ class Disconnect:
 class GetPoolSizeRes:
     """GetPoolSize response from virtual client manager."""
 
-    pool_size: int
+    train_ids: List[Scalar]
+    val_ids: Optional[List[Scalar]] = None
+    test_ids: Optional[List[Scalar]] = None
 
 
 @dataclass

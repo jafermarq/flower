@@ -33,7 +33,7 @@ class GrpcVirtualClientManagerProxy(VirtualClientManagerProxy):
         super().__init__(pool_size)
         self.bridge = bridge
 
-    def get_pool_size(self) -> common.GetPoolSizeRes:
+    def get_pool_ids(self) -> common.GetPoolSizeRes:
 
         get_pool_size_msg = serde.get_pool_size_to_proto()
         vcm_msg: VirtualClientManagerMessage = self.bridge.request(

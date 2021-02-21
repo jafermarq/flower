@@ -36,7 +36,7 @@ def handle(
         disconnect_msg, sleep_duration = _disconnect(vcm)
         return disconnect_msg, sleep_duration, False
     if rcm_msg.HasField("get_pool_size"):
-        return _get_pool_size(vcm), 0, True
+        return _get_pool_ids(vcm), 0, True
     if rcm_msg.HasField("wakeup_clients"):
         return _wakeup_clients(vcm, rcm_msg.wakeup_clients), 0, True
     if rcm_msg.HasField("is_available"):
@@ -46,11 +46,11 @@ def handle(
     raise UnkownRemoteClientManagerMessage()
 
 
-def _get_pool_size(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
+def _get_pool_ids(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
     # print("> vcm.grpc_vcm.message_handler._get_pool_size()")
     # No need to deserialize _get_pool_size (it's empty)
-    num_clients = vcm.get_pool_size()
-    pool_size_res_proto = serde.get_pool_size_res_to_proto(num_clients)
+    pool_size_res = vcm.get_pool_ids()
+    pool_size_res_proto = serde.get_pool_size_res_to_proto(pool_size_res)
     return VirtualClientManagerMessage(get_pool_size_res=pool_size_res_proto)
 
 

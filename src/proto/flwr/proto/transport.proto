@@ -83,7 +83,11 @@ message ClientMessage {
 }
 
 message VirtualClientManagerMessage {
-  message GetPoolSizeRes { int32 pool_size = 1; }
+  message GetPoolSizeRes {
+    repeated Scalar train_ids = 1;
+    repeated Scalar val_ids = 2;
+    repeated Scalar test_ids = 3;
+  }
   message WakeUpClientsRes { Reason reason = 1; }
   message IsAvailableRes { bool available = 1; }
   message DisconnectRes { Reason reason = 1; }
