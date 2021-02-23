@@ -107,17 +107,19 @@ class Server:
 
         for current_round in range(self.starting_round, num_rounds + 1):
             # Train model and replace previous global model
-            weights_prime = self.fit_round(rnd=current_round)
+            weights_prime, client_metrics = self.fit_round(rnd=current_round)
             if weights_prime is not None:
                 self.weights = weights_prime
 
+            metrics = {'acc_cen': None, 'loss_cen': None, 
+                       'acc_fed': None, 'loss_fed': None}
             # Evaluate model using strategy implementation
             if self.strategy.eval_fn is not None:
                 # centralized evaluation
                 res_cen = self.strategy.evaluate(weights=self.weights)
                 if res_cen is not None:
                     loss_cen, acc_cen = res_cen
-                    metrics = {'acc_cen': acc_cen, 'loss_cen': loss_cen}
+                    metrics['acc_cen'], metrics['loss_cen'] = acc_cen, loss_cen
                     t_round = timeit.default_timer() - start_time
                     log(
                         INFO,
@@ -134,7 +136,7 @@ class Server:
                 res_fed = self.evaluate(rnd=current_round)
                 if res_fed is not None and res_fed[0] is not None:
                     loss_fed, _ = res_fed
-                    metrics = {'acc_fed': None, 'loss_fed': loss_fed}
+                    metrics['loss_fed'] = loss_fed
                     t_round = timeit.default_timer() - start_time
                     log(
                         INFO,
@@ -148,7 +150,8 @@ class Server:
                     )
 
             # Round ended, run post round stages
-            args = {'current_round': current_round, **metrics,
+            args = {'current_round': current_round, 'server_metrics': metrics,
+                    'client_metrics': client_metrics,
                     'weights': self.weights, 't_round': t_round}
 
             self.on_round_end(args)
@@ -281,8 +284,9 @@ class Server:
             len(failures),
         )
 
-        # Aggregate training results
-        return self.strategy.aggregate_fit(rnd, results, failures)
+        # Return metrics and aggregated training results
+        metrics = [res[1].metrics for res in results]
+        return self.strategy.aggregate_fit(rnd, results, failures), metrics
 
     def disconnect_all_clients(self) -> None:
         """Send shutdown signal to all clients."""
