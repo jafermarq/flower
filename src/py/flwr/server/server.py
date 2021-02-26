@@ -108,8 +108,8 @@ class Server:
 
         # wait until VCM(s) have connected, send config and
         # get pool client info
-        assert(self.config is not None), "Make sure you passed a serialised config duing on_init()."
-                                         " This is needed to initialize the VCM(s)."
+        assert(self.config is not None), ("Make sure you passed a serialised config during on_init()." +
+                                         " This is needed to initialize the VCM(s).")
         self._client_manager.init_upon_vcm_connects(self.config)
 
         # # now send config to the VCM that just connected:
