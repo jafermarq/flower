@@ -111,22 +111,25 @@ def _fl(server: Server, config: Dict[str, int]) -> None:
     log(INFO, "app_fit: losses_centralized %s", str(hist.losses_centralized))
     log(INFO, "app_fit: accuracies_centralized %s", str(hist.accuracies_centralized))
 
-    # Temporary workaround to force distributed evaluation
-    server.strategy.eval_fn = None  # type: ignore
+    # ! We've desabled this because we already make the distinction between a
+    # ! centralized vs federated evalutaion stage. Because of this, it doesn't make
+    # ! sense to perform federated evaluation in settings where we evaluate the model in a centrallised fashion
+    # # Temporary workaround to force distributed evaluation
+    # server.strategy.eval_fn = None  # type: ignore
 
-    # Evaluate the final trained model
-    res = server.evaluate(rnd=-1)
-    if res is not None:
-        loss, (results, failures) = res
-        log(INFO, "app_evaluate: federated loss: %s", str(loss))
-        log(
-            INFO,
-            "app_evaluate: results %s",
-            str([(res[0].cid, res[1]) for res in results]),
-        )
-        log(INFO, "app_evaluate: failures %s", str(failures))
-    else:
-        log(INFO, "app_evaluate: no evaluation result")
+    # # Evaluate the final trained model
+    # res = server.evaluate(rnd=-1)
+    # if res is not None:
+    #     loss, (results, failures) = res
+    #     log(INFO, "app_evaluate: federated loss: %s", str(loss))
+    #     log(
+    #         INFO,
+    #         "app_evaluate: results %s",
+    #         str([(res[0].cid, res[1]) for res in results]),
+    #     )
+    #     log(INFO, "app_evaluate: failures %s", str(failures))
+    # else:
+    #     log(INFO, "app_evaluate: no evaluation result")
 
     # Graceful shutdown
     server.disconnect_all_clients()
