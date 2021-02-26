@@ -95,6 +95,7 @@ message VirtualClientManagerMessage {
     bool wait = 1;
     int32 num_clients = 2;
   }
+  message SetConfigRes {Reason reason = 1;}
 
   oneof msg {
     GetPoolSizeRes get_pool_size_res = 1;
@@ -102,6 +103,7 @@ message VirtualClientManagerMessage {
     IsAvailableRes is_available_res = 3;
     DisconnectRes disconnect_res = 4;
     IsReadyForSamplingRes is_ready_for_sampling_res = 5;
+    SetConfigRes set_config_res = 6;
   }
 }
 
@@ -111,6 +113,7 @@ message RemoteClientManagerMessage {
   message IsAvailable {}
   message Disconnect {}
   message IsReadyForSampling {}
+  message SetConfig {string config = 1;}
 
   oneof msg {
     GetPoolSize get_pool_size = 1;
@@ -118,6 +121,7 @@ message RemoteClientManagerMessage {
     IsAvailable is_available = 3;
     Disconnect disconnect = 4;
     IsReadyForSampling is_ready_for_sampling = 5;
+    SetConfig set_config = 6;
   }
 } 
 

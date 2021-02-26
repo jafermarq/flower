@@ -85,3 +85,15 @@ class GrpcVirtualClientManagerProxy(VirtualClientManagerProxy):
         # print("is_ready_for_sampling")
         # print(f"vcm_msg: {vcm_msg}")
         return serde.is_ready_for_sampling_res_from_proto(vcm_msg.is_ready_for_sampling_res)
+
+    def set_config(self, config: str) -> str:
+
+        set_config_msg = serde.setconfig_to_proto(config)
+
+        vcm_msg: VirtualClientManagerMessage = self.bridge.request(
+            RemoteClientManagerMessage(set_config=set_config_msg)
+        )
+
+        # reply is a string (e.g. ACK), no need for fancy serde stages..
+        res = vcm_msg.set_config_res.reason
+        return res

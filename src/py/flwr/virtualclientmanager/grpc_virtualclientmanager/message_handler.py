@@ -43,6 +43,8 @@ def handle(
         return _is_available(vcm), 0, True
     if rcm_msg.HasField("is_ready_for_sampling"):
         return _is_ready_for_sampling(vcm), 0, True
+    if rcm_msg.HasField("set_config"):
+        return _set_config(vcm, rcm_msg.set_config), 0, True
     raise UnkownRemoteClientManagerMessage()
 
 
@@ -91,3 +93,13 @@ def _is_ready_for_sampling(vcm: VirtualClientManager) -> VirtualClientManagerMes
     res_proto = serde.is_ready_for_sampling_res_to_proto(res)
     # print(f"res_proto: {res_proto}")
     return VirtualClientManagerMessage(is_ready_for_sampling_res=res_proto)
+
+
+def _set_config(vcm: VirtualClientManager, mssg: RemoteClientManagerMessage.SetConfig) -> VirtualClientManagerMessage:
+
+    config_str = serde.setconfig_from_proto(mssg)
+    vcm.set_config(config_str)
+
+    # return ACK back to RCM
+    res = serde.set_config_res_to_proto(Reason.ACK)
+    return VirtualClientManagerMessage(set_config_res=res)

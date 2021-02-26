@@ -283,11 +283,20 @@ class RemoteClientManager(SimpleClientManager):
         for vcm in self.vcm:
             _ = vcm.disconnect()
 
-    def init_upon_vcm_connects(self) -> None:
-        """Waits for VCMs to connect with Server/RCM."""
+    def init_upon_vcm_connects(self, config: dict) -> None:
+        """Waits for VCMs to connect with Server/RCM. Then sends the config to
+        VCM and waits until received pool information."""
         if not(self.vcm):
             # wait until VCMs are connected for the first time
             self.wait_for_vcm(self.num_vcm)
+            # send config to each vcm
+            for i, vcm in enumerate(self.vcm):
+                res = vcm.set_config(config)
+                if res != 4:  # 4 == ACK from proto
+                    print(f"Error sending config to vcm_{i}. Disconecting VCM")
+                    self.unregister_vcm(vcm)
+                else:
+                    print(f"Seding config to vcm_{i}: ACK")
             self.get_virtual_pool_ids()
 
     def sample(

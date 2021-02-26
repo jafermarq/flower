@@ -21,6 +21,7 @@ from flwr.common import (
     GetPoolSizeRes,
     WakeUpClientsIns,
     IsAvailableRes,
+    ReadyForSamplingRes,
     Disconnect
 )
 
@@ -42,7 +43,16 @@ class VirtualClientManagerProxy(ABC):
 
     @abstractmethod
     def is_available(self) -> IsAvailableRes:
-        """Tells whether the VCM still has submitted jobs that haven't finished running"""
+        """Tells whether the VCM still has submitted jobs that haven't finished running."""
+
+    @abstractmethod
+    def is_ready_for_sampling(self) -> ReadyForSamplingRes:
+        """Tells RemoteClientManager that some clients are ready to be sampled."""
+
+    @abstractmethod
+    def set_config(self, serialised_config: str) -> None:
+        """Used by the RemoteClientManager to send the config containing client/vcm side parameters.
+        This config is a serialised dict obtained when launching the server and reading a toml file."""
 
     @abstractmethod
     def disconnect(self) -> Disconnect:

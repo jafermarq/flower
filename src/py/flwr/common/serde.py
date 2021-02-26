@@ -283,6 +283,23 @@ def is_ready_for_sampling_res_to_proto(res: typing.ReadyForSamplingRes) -> Virtu
 def is_ready_for_sampling_res_from_proto(msg: VirtualClientManagerMessage.IsReadyForSamplingRes) -> typing.ReadyForSamplingRes:
     # print("serde.is_ready_for_sampling_res_from_proto")
     return typing.ReadyForSamplingRes(wait=msg.wait, num_clients=msg.num_clients)
+
+
+# === SendConfig messages ===
+
+
+def setconfig_to_proto(config: str) -> RemoteClientManagerMessage.SetConfig:
+    return RemoteClientManagerMessage.SetConfig(config=config)
+
+
+def setconfig_from_proto(msg: RemoteClientManagerMessage.SetConfig) -> str:
+    return msg.config
+
+
+def set_config_res_to_proto(res: typing.SetConfigRes) -> VirtualClientManagerMessage.SetConfigRes:
+    return VirtualClientManagerMessage.SetConfigRes(reason=res)
+
+
 # === Metrics messages ===
 
 

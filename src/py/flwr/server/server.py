@@ -70,6 +70,10 @@ class Server:
         self.strategy: Strategy = set_strategy(strategy)
         self.starting_round = 1
 
+        # to be passed during on_init()
+        # this will be sent to the VCMs
+        self.config = None
+
         # init global model
         self.weights = init_global_model_fn()
 
@@ -102,8 +106,16 @@ class Server:
         log(INFO, "[TIME] FL starting")
         start_time = timeit.default_timer()
 
-        # wait until VCM(s) have connected
-        self._client_manager.init_upon_vcm_connects()
+        # wait until VCM(s) have connected, send config and
+        # get pool client info
+        assert(self.config is not None), "Make sure you passed a serialised config duing on_init()."
+                                         " This is needed to initialize the VCM(s)."
+        self._client_manager.init_upon_vcm_connects(self.config)
+
+        # # now send config to the VCM that just connected:
+        # print("Sending config to VCM(s)")
+        # for vcm in self._client_manager.vcm:
+        #     vcm.set_config(self.config)
 
         for current_round in range(self.starting_round, num_rounds + 1):
             # Train model and replace previous global model

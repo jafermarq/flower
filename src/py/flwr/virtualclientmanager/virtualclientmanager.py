@@ -45,4 +45,9 @@ class VirtualClientManager(ABC):
 
     @abstractmethod
     def is_ready_for_sampling(self) -> ReadyForSamplingRes:
-        """Tels RemoteClientManager that some clients are ready to be sampled."""
+        """Tells RemoteClientManager that some clients are ready to be sampled."""
+
+    @abstractmethod
+    def set_config(self, serialised_config: str) -> None:
+        """Used by the RemoteClientManager to send the config containing client/vcm side parameters.
+        This config is a serialised dict obtained when launching the server and reading a toml file."""

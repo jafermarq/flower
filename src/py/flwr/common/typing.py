@@ -135,3 +135,9 @@ class ReadyForSamplingRes:
 
     wait: bool
     num_clients: int
+
+@dataclass
+class SetConfigRes:
+    """VirtualClientManager replying back to RemoteClientManager saying it got the config"""
+
+    reason: str
