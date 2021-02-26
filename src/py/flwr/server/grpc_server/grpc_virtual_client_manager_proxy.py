@@ -53,17 +53,6 @@ class GrpcVirtualClientManagerProxy(VirtualClientManagerProxy):
         wakeup_clients_res = serde.wakeup_clients_res_from_proto(vcm_msg.wakeup_clients_res)
         return wakeup_clients_res
 
-    def is_available(self) -> common.IsAvailableRes:
-        # print("GrpcVirtualClientManagerProxy.is_available()")
-        is_available_msg = serde.is_available_to_proto()
-
-        vcm_msg: VirtualClientManagerMessage = self.bridge.request(
-            RemoteClientManagerMessage(is_available=is_available_msg)
-        )
-
-        is_available_res = serde.is_available_res_from_proto(vcm_msg.is_available_res)
-        return is_available_res
-
     def disconnect(self) -> common.Disconnect:
         disconnect_msg = serde.disconnect_vcm_to_proto()
 

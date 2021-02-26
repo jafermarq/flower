@@ -121,14 +121,6 @@ class WakeUpClientsRes:
 
 
 @dataclass
-class IsAvailableRes:
-    """VirtualClientManager replying back to RemoteClientManager indicting
-    if it is still running jobs from previous `wakeup_clients` request."""
-
-    status: bool
-
-
-@dataclass
 class ReadyForSamplingRes:
     """Contains: boolean telling if the RemoteClientManager can sample from the
     connected clients and a integer that indicates the number of clients ready."""

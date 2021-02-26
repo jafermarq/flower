@@ -33,7 +33,6 @@ from .typing import Weights as Weights
 from .typing import GetPoolSizeRes as GetPoolSizeRes
 from .typing import WakeUpClientsIns as WakeUpClientsIns
 from .typing import WakeUpClientsRes as WakeUpClientsRes
-from .typing import IsAvailableRes as IsAvailableRes
 from .typing import ReadyForSamplingRes as ReadyForSamplingRes
 
 GRPC_MAX_MESSAGE_LENGTH: int = 536_870_912  # == 512 * 1024 * 1024
@@ -58,6 +57,5 @@ __all__ = [
     "GetPoolSizeRes",
     "WakeUpClientsIns",
     "WakeUpClientsRes",
-    "IsAvailableRes",
     "ReadyForSamplingRes",
 ]

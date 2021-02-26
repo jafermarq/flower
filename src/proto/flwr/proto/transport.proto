@@ -89,7 +89,6 @@ message VirtualClientManagerMessage {
     repeated Scalar test_ids = 3;
   }
   message WakeUpClientsRes { Reason reason = 1; }
-  message IsAvailableRes { bool available = 1; }
   message DisconnectRes { Reason reason = 1; }
   message IsReadyForSamplingRes {
     bool wait = 1;
@@ -100,17 +99,15 @@ message VirtualClientManagerMessage {
   oneof msg {
     GetPoolSizeRes get_pool_size_res = 1;
     WakeUpClientsRes wakeup_clients_res = 2;
-    IsAvailableRes is_available_res = 3;
-    DisconnectRes disconnect_res = 4;
-    IsReadyForSamplingRes is_ready_for_sampling_res = 5;
-    SetConfigRes set_config_res = 6;
+    DisconnectRes disconnect_res = 3;
+    IsReadyForSamplingRes is_ready_for_sampling_res = 4;
+    SetConfigRes set_config_res = 5;
   }
 }
 
 message RemoteClientManagerMessage {
   message GetPoolSize {}
   message WakeUpClients { string cids = 1; }
-  message IsAvailable {}
   message Disconnect {}
   message IsReadyForSampling {}
   message SetConfig {string config = 1;}
@@ -118,10 +115,9 @@ message RemoteClientManagerMessage {
   oneof msg {
     GetPoolSize get_pool_size = 1;
     WakeUpClients wakeup_clients = 2;
-    IsAvailable is_available = 3;
-    Disconnect disconnect = 4;
-    IsReadyForSampling is_ready_for_sampling = 5;
-    SetConfig set_config = 6;
+    Disconnect disconnect = 3;
+    IsReadyForSampling is_ready_for_sampling = 4;
+    SetConfig set_config = 5;
   }
 } 
 

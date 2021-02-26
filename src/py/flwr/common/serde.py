@@ -239,21 +239,6 @@ def wakeup_clients_res_from_proto(msg: VirtualClientManagerMessage.WakeUpClients
     return typing.WakeUpClientsRes(reason=msg.reason)
 
 
-# === IsAvailable (VCM) messages ===
-
-def is_available_to_proto() -> RemoteClientManagerMessage.IsAvailable:
-    return RemoteClientManagerMessage.IsAvailable()
-
-
-def is_available_res_to_proto(res: typing.IsAvailableRes) -> VirtualClientManagerMessage.IsAvailableRes:
-    return VirtualClientManagerMessage.IsAvailableRes(available=res.status)
-
-
-def is_available_res_from_proto(msg: VirtualClientManagerMessage.IsAvailableRes) -> typing.IsAvailableRes:
-    status = msg.available
-    return typing.IsAvailableRes(status=status)
-
-
 # === Disconnect VCM ===
 
 def disconnect_vcm_to_proto() -> RemoteClientManagerMessage.Disconnect:

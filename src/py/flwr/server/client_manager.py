@@ -155,7 +155,6 @@ class RemoteClientManager(SimpleClientManager):
         self.pool_ids: GetPoolSizeRes
         self.ids_to_use = None
         self.num_vcm = num_vcm
-        self.wait_until_vcm_is_available: bool = True
         self.vcm_failure: bool = False
 
     def wait_for_vcm(self, num_vcm: int, timeout: int = 86400) -> bool:
@@ -249,27 +248,13 @@ class RemoteClientManager(SimpleClientManager):
             mssg_ins = WakeUpClientsIns(cids=mssg)
             self.vcm[0].wakeup_clients(mssg_ins)
 
-    def check_if_vcm_is_available(self) -> bool:
-        """Check if there are Ray jobs running on the VirtualClientManager
-        side."""
-        # TODO: Can we simplify this?
-        available = [False] * len(self.vcm)
-        # We skip this if the VCM is in the middle of a round
-        while not(all(available)) and self.wait_until_vcm_is_available:
-            for i, vcm in enumerate(self.vcm):
-                available[i] = vcm.is_available().status
-            # print(f"available: {available} --> {not(all(available))}")
-            time.sleep(5)
-
-        self.wait_until_vcm_is_available = False
-        # print(f"OBTAINED: {status_res}")
-        return all(available)
-
-    def start_new_round(self) -> None:
-        """ Indicate that we want to wait in check_if_vcm_is_available()
-        for the VCM to be ready. """
-        self.wait_until_vcm_is_available = True
+    def start_new_round(self, clients_per_round: int) -> None:
+        """ A new round begins -> wake up clients for this round."""
         self.vcm_failure = False
+
+        # sample and wakeup clients for this round
+        cids = random.sample(self.ids_to_use, clients_per_round)
+        self.wakeup_clients(cids)
 
     def update_id_list_to_use(self, ids: List[int]) -> None:
         """ Updates the list of client ids to wake up ahead of a call to
@@ -311,21 +296,21 @@ class RemoteClientManager(SimpleClientManager):
         when passing the strategy object upon server construction."""
 
         # print(f"sample(self, {num_clients}, {min_num_clients})")
-        if min_num_clients is None:
-            # we'll reach this point when sampling client0 to init global weights
-            min_num_clients = num_clients
+        # if min_num_clients is None:
+        #     # we'll reach this point when sampling client0 to init global weights
+        #     min_num_clients = num_clients
 
-        if not(self.vcm):
-            # TODO: what's the best way to implement fault tolerance?
-            # wait until VCMs are connected for the first time
-            self.wait_for_vcm(self.num_vcm)
-            self.get_virtual_pool_ids()
+        # if not(self.vcm):
+        #     # TODO: what's the best way to implement fault tolerance?
+        #     # wait until VCMs are connected for the first time
+        #     self.wait_for_vcm(self.num_vcm)
+        #     self.get_virtual_pool_ids()
 
         # Wakeup clients in cid in cids
-        if self.check_if_vcm_is_available():
-            # Take `min_num_clients` from total number of clients in pool
-            cids = random.sample(self.ids_to_use, min_num_clients)
-            self.wakeup_clients(cids)
+        # if self.check_if_vcm_is_available():
+        #     # Take `min_num_clients` from total number of clients in pool
+        #     cids = random.sample(self.ids_to_use, min_num_clients)
+        #     self.wakeup_clients(cids)
 
         # Block until clients managed by VCM are instantiated,
         # allocated, warmedup and connected to the server.

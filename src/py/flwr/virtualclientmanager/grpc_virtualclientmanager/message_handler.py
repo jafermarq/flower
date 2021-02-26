@@ -39,8 +39,6 @@ def handle(
         return _get_pool_ids(vcm), 0, True
     if rcm_msg.HasField("wakeup_clients"):
         return _wakeup_clients(vcm, rcm_msg.wakeup_clients), 0, True
-    if rcm_msg.HasField("is_available"):
-        return _is_available(vcm), 0, True
     if rcm_msg.HasField("is_ready_for_sampling"):
         return _is_ready_for_sampling(vcm), 0, True
     if rcm_msg.HasField("set_config"):
@@ -65,14 +63,6 @@ def _wakeup_clients(vcm: VirtualClientManager, wakeup_msg: RemoteClientManagerMe
     vcm.wakeup_clients(wakeup_clients_ins.cids)
     res = serde.wakeup_clients_res_to_proto(Reason.ACK)
     return VirtualClientManagerMessage(wakeup_clients_res=res)
-
-
-def _is_available(vcm: VirtualClientManager) -> VirtualClientManagerMessage:
-    # print("> vcm.grpc_vcm.message_handler._is_available()")
-    # No need to deserialize _is_available (it's empty)
-    status = vcm.is_available()
-    pool_size_res_proto = serde.is_available_res_to_proto(status)
-    return VirtualClientManagerMessage(is_available_res=pool_size_res_proto)
 
 
 # pylint: disable=unused-argument

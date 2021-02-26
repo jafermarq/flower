@@ -221,9 +221,6 @@ class Server:
         results = []
         failures = []
 
-        # indicate that a new round starts so RCM should wait for VCM to be available
-        self._client_manager.start_new_round()
-
         # determine what task are we donig (fit/evaluate) and notivy the RCM. This is
         # needed so the RCM samples from the correct list of client_ids for training and
         # for evaluation respectively.
@@ -238,6 +235,9 @@ class Server:
         else:
             raise NotImplementedError()
 
+        # indicate that a new round starts so RCM should wait for VCM to be available
+        self._client_manager.start_new_round(self.strategy.min_fit_clients)
+        
         with tqdm(total=self.strategy.min_fit_clients, desc=tqdm_tile) as t:
             while len(results) < self.strategy.min_fit_clients:
 
