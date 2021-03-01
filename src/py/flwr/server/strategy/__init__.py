@@ -19,6 +19,7 @@ from .default import DefaultStrategy as DefaultStrategy
 from .fast_and_slow import FastAndSlow as FastAndSlow
 from .fault_tolerant_fedavg import FaultTolerantFedAvg as FaultTolerantFedAvg
 from .fedadagrad import FedAdagrad as FedAdagrad
+from .fedadagrad_orig import FedAdagradOriginal as FedAdagradOriginal
 from .fedadam import FedAdam as FedAdam
 from .fedavg import FedAvg as FedAvg
 from .fedfs_v0 import FedFSv0 as FedFSv0
@@ -37,4 +38,5 @@ __all__ = [
     "FedFSv1",
     "QffedAvg",
     "Strategy",
+    "FedAdagradOriginal"
 ]
