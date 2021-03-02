@@ -74,6 +74,9 @@ class Server:
         # this will be sent to the VCMs
         self.config = None
 
+        self.eval_every_n = 1
+        self.skip_validation_eval = False
+
         # init global model
         self.weights = init_global_model_fn()
 
@@ -123,43 +126,31 @@ class Server:
             if weights_prime is not None:
                 self.weights = weights_prime
 
-            metrics = {'acc_cen': None, 'loss_cen': None, 
+            metrics = {'acc_cen': None, 'loss_cen': None,
                        'acc_fed': None, 'loss_fed': None}
-            # Evaluate model using strategy implementation
-            if self.strategy.eval_fn is not None:
-                # centralized evaluation
-                res_cen = self.strategy.evaluate(weights=self.weights)
-                if res_cen is not None:
-                    loss_cen, acc_cen = res_cen
-                    metrics['acc_cen'], metrics['loss_cen'] = acc_cen, loss_cen
+
+            if current_round % self.eval_every_n == 0:
+                # Evaluate on validation set (always federated)
+                if self.skip_validation_eval:
+                    print("> Undefined Validation split (skipping round eval...)")
                     t_round = timeit.default_timer() - start_time
-                    log(
-                        INFO,
-                        "fit progress: (%s, %s, %s, %s)",
-                        current_round,
-                        loss_cen,
-                        acc_cen,
-                        t_round,
-                    )
-                    history.add_loss_centralized(rnd=current_round, loss=loss_cen)
-                    history.add_accuracy_centralized(rnd=current_round, acc=acc_cen)
-            else:
-                # evaluation on clients
-                res_fed = self.evaluate(rnd=current_round)
-                if res_fed is not None and res_fed[0] is not None:
-                    loss_fed, _ = res_fed
-                    metrics['loss_fed'] = loss_fed
-                    t_round = timeit.default_timer() - start_time
-                    log(
-                        INFO,
-                        "eval(fed): (%s, %s, %s)",
-                        current_round,
-                        loss_fed,
-                        t_round,
-                    )
-                    history.add_loss_distributed(
-                        rnd=current_round, loss=cast(float, loss_fed)
-                    )
+                else:
+                    res_fed = self.evaluate(rnd=current_round, is_testset=False)
+                    if res_fed is not None and res_fed[0] is not None:
+                        loss_fed, acc_fed, _ = res_fed
+                        metrics['loss_fed'] = loss_fed
+                        metrics['acc_fed'] = acc_fed
+                        t_round = timeit.default_timer() - start_time
+                        log(
+                            INFO, "eval(fed): (loss:%s, acc:%s, time:%s)",
+                            loss_fed, acc_fed, t_round,
+                        )
+                        history.add_loss_distributed(
+                            rnd=current_round, loss=cast(float, loss_fed)
+                        )
+                        history.add_accuracy_distributed(
+                            rnd=current_round, acc=cast(float, acc_fed)
+                        )
 
             # Round ended, run post round stages
             args = {'current_round': current_round, 'server_metrics': metrics,
@@ -167,6 +158,42 @@ class Server:
                     'weights': self.weights, 't_round': t_round}
 
             self.on_round_end(args)
+
+        # evaluate on test set
+        print("> Training ended. Evaluating on test set")
+        if self.strategy.eval_fn is not None:
+            # centralized evaluation
+            res_cen = self.strategy.evaluate(weights=self.weights)
+            if res_cen is not None:
+                loss_cen, acc_cen = res_cen
+                metrics['acc_cen'], metrics['loss_cen'] = acc_cen, loss_cen
+                t_round = timeit.default_timer() - start_time
+                log(
+                    INFO, "fit progress: (%s, %s, %s, %s)",
+                    current_round, loss_cen,
+                    acc_cen, t_round,
+                )
+                history.add_loss_centralized(rnd=current_round, loss=loss_cen)
+                history.add_accuracy_centralized(rnd=current_round, acc=acc_cen)
+        else:
+            # evaluation on clients
+            res_fed = self.evaluate(rnd=current_round, is_testset=True)
+            if res_fed is not None and res_fed[0] is not None:
+                loss_fed, acc_fed, _ = res_fed
+                metrics['loss_fed'] = loss_fed
+                metrics['acc_fed'] = acc_fed
+                t_round = timeit.default_timer() - start_time
+                log(
+                    INFO, "eval(fed): (%s, %s, %s, %s)",
+                    current_round, loss_fed,
+                    acc_fed, t_round,
+                )
+                history.add_loss_distributed(
+                    rnd=current_round, loss=cast(float, loss_fed)
+                )
+                history.add_accuracy_distributed(
+                    rnd=current_round, acc=cast(float, acc_fed)
+                )
 
         # Bookkeeping
         end_time = timeit.default_timer()
@@ -180,14 +207,16 @@ class Server:
         return history
 
     def evaluate(
-        self, rnd: int
+        self, rnd: int, is_testset: bool
     ) -> Optional[Tuple[Optional[float], EvaluateResultsAndFailures]]:
         """Validate current global model on a number of clients."""
 
         # # ! this can certainly be done in a nicer way...
         if isinstance(self._client_manager, RemoteClientManager):
 
-            results_and_failures = self._round_with_rcm(self.strategy.configure_evaluate, evaluate_clients, rnd)
+            results_and_failures = self._round_with_rcm(self.strategy.configure_evaluate,
+                                                        evaluate_clients,
+                                                        rnd, is_testset)
             results, failures = results_and_failures
         else:
             # Get clients and their respective instructions from strategy
@@ -213,10 +242,10 @@ class Server:
                 len(failures),
             )
         # Aggregate the evaluation results
-        loss_aggregated = self.strategy.aggregate_evaluate(rnd, results, failures)
-        return loss_aggregated, results_and_failures
+        loss_aggregated, acc_aggregated = self.strategy.aggregate_evaluate(rnd, results, failures)
+        return loss_aggregated, acc_aggregated, results_and_failures
 
-    def _round_with_rcm(self, get_instructions_fn, task_fn, rnd):
+    def _round_with_rcm(self, get_instructions_fn, task_fn, rnd, is_testset: bool = False):
 
         results = []
         failures = []
@@ -228,18 +257,26 @@ class Server:
         # easy to understand and revisit in the future if necessary.
         if task_fn == fit_clients:
             self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.train_ids)
+            num_to_sample = self.strategy.min_fit_clients
             tqdm_tile = f'Round #{rnd}'
         elif task_fn == evaluate_clients:
-            self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
-            tqdm_tile = "Eval"
+            # we ensure we sample all clients for val/test
+            if is_testset:
+                self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.test_ids)
+                num_to_sample = len(self._client_manager.pool_ids.test_ids)
+                tqdm_tile = "Test"
+            else:
+                self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
+                num_to_sample = len(self._client_manager.pool_ids.val_ids)
+                tqdm_tile = "Eval"
         else:
             raise NotImplementedError()
 
         # indicate that a new round starts so RCM should wait for VCM to be available
-        self._client_manager.start_new_round(self.strategy.min_fit_clients)
+        self._client_manager.start_new_round(num_to_sample)
         
-        with tqdm(total=self.strategy.min_fit_clients, desc=tqdm_tile) as t:
-            while len(results) < self.strategy.min_fit_clients:
+        with tqdm(total=num_to_sample, desc=tqdm_tile) as t:
+            while len(results) < num_to_sample:
 
                 # Get clients and their respective instructions from strategy
                 client_instructions = get_instructions_fn(rnd=rnd, weights=self.weights,

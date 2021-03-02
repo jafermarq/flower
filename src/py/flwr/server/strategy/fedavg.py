@@ -33,7 +33,7 @@ from flwr.common import (
 from flwr.server.client_manager import ClientManager
 from flwr.server.client_proxy import ClientProxy
 
-from .aggregate import aggregate, weighted_loss_avg
+from .aggregate import aggregate, weighted_loss_acc_avg
 from .strategy import Strategy
 
 
@@ -139,8 +139,8 @@ class FedAvg(Strategy):
         """Configure the next round of evaluation."""
         # Do not configure federated evaluation if a centralized evaluation
         # function is provided
-        if self.eval_fn is not None:
-            return []
+        # if self.eval_fn is not None:
+        #     return []
 
         # Parameters and config
         parameters = weights_to_parameters(weights)
@@ -195,7 +195,7 @@ class FedAvg(Strategy):
         # Do not aggregate if there are failures and failures are not accepted
         if not self.accept_failures and failures:
             return None
-        return weighted_loss_avg(
+        return weighted_loss_acc_avg(
             [
                 (evaluate_res.num_examples, evaluate_res.loss, evaluate_res.accuracy)
                 for _, evaluate_res in results

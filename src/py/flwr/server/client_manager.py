@@ -182,7 +182,7 @@ class RemoteClientManager(SimpleClientManager):
 
         # add VCM to list
         self.vcm.append(vcm)
-        print(f"RMC has {len(self.vcm)}/{self.num_vcm} VCM(s) connected")
+        print(f"RCM has {len(self.vcm)}/{self.num_vcm} VCM(s) connected")
 
         with self._cv:
             self._cv.notify_all()
@@ -253,8 +253,11 @@ class RemoteClientManager(SimpleClientManager):
         self.vcm_failure = False
 
         # sample and wakeup clients for this round
-        cids = random.sample(self.ids_to_use, clients_per_round)
-        self.wakeup_clients(cids)
+        if len(self.ids_to_use) > 0:
+            cids = random.sample(self.ids_to_use, clients_per_round)
+            self.wakeup_clients(cids)
+        else:
+            print("> List doesn't contain cids..")
 
     def update_id_list_to_use(self, ids: List[int]) -> None:
         """ Updates the list of client ids to wake up ahead of a call to
@@ -295,23 +298,6 @@ class RemoteClientManager(SimpleClientManager):
         Always num_clients==min_num_clients, this number is specified
         when passing the strategy object upon server construction."""
 
-        # print(f"sample(self, {num_clients}, {min_num_clients})")
-        # if min_num_clients is None:
-        #     # we'll reach this point when sampling client0 to init global weights
-        #     min_num_clients = num_clients
-
-        # if not(self.vcm):
-        #     # TODO: what's the best way to implement fault tolerance?
-        #     # wait until VCMs are connected for the first time
-        #     self.wait_for_vcm(self.num_vcm)
-        #     self.get_virtual_pool_ids()
-
-        # Wakeup clients in cid in cids
-        # if self.check_if_vcm_is_available():
-        #     # Take `min_num_clients` from total number of clients in pool
-        #     cids = random.sample(self.ids_to_use, min_num_clients)
-        #     self.wakeup_clients(cids)
-
         # Block until clients managed by VCM are instantiated,
         # allocated, warmedup and connected to the server.
 
@@ -327,6 +313,7 @@ class RemoteClientManager(SimpleClientManager):
 
         # ensure the number of clients that VCM said are online
         # are indeed connected
+        # print(f"RCM is waiting for {sum(clients_wait_for)} clients")
         self.wait_for(sum(clients_wait_for))
 
         # Sample clients which meet the criterion

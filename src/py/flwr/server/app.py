@@ -106,10 +106,10 @@ def _init_defaults(
 def _fl(server: Server, config: Dict[str, int]) -> None:
     # Fit model
     hist = server.fit(num_rounds=config["num_rounds"])
-    log(INFO, "app_fit: losses_distributed %s", str(hist.losses_distributed))
-    log(INFO, "app_fit: accuracies_distributed %s", str(hist.accuracies_distributed))
-    log(INFO, "app_fit: losses_centralized %s", str(hist.losses_centralized))
-    log(INFO, "app_fit: accuracies_centralized %s", str(hist.accuracies_centralized))
+    # log(INFO, "app_fit: losses_distributed %s", str(hist.losses_distributed))
+    # log(INFO, "app_fit: accuracies_distributed %s", str(hist.accuracies_distributed))
+    # log(INFO, "app_fit: losses_centralized %s", str(hist.losses_centralized))
+    # log(INFO, "app_fit: accuracies_centralized %s", str(hist.accuracies_centralized))
 
     # ! We've desabled this because we already make the distinction between a
     # ! centralized vs federated evalutaion stage. Because of this, it doesn't make
