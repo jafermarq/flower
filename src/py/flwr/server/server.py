@@ -195,6 +195,12 @@ class Server:
                     rnd=current_round, acc=cast(float, acc_fed)
                 )
 
+        # Round ended, run post round stages
+        args = {'current_round': current_round+1, 'server_metrics': metrics,
+                'weights': self.weights, 't_round': t_round}
+
+        self.on_round_end(args)
+
         # Bookkeeping
         end_time = timeit.default_timer()
         elapsed = end_time - start_time
