@@ -94,16 +94,6 @@ class Server:
     def fit(self, num_rounds: int) -> History:
         """Run federated averaging for a number of rounds."""
         history = History()
-        # res = self.strategy.evaluate(weights=self.weights)
-        # if res is not None:
-        #     log(
-        #         INFO,
-        #         "initial weights (loss/accuracy): %s, %s",
-        #         res[0],
-        #         res[1],
-        #     )
-        #     history.add_loss_centralized(rnd=0, loss=res[0])
-        #     history.add_accuracy_centralized(rnd=0, acc=res[1])
 
         # Run federated learning for num_rounds
         log(INFO, "[TIME] FL starting")
@@ -114,11 +104,6 @@ class Server:
         assert(self.config is not None), ("Make sure you passed a serialised config during on_init()." +
                                          " This is needed to initialize the VCM(s).")
         self._client_manager.init_upon_vcm_connects(self.config)
-
-        # # now send config to the VCM that just connected:
-        # print("Sending config to VCM(s)")
-        # for vcm in self._client_manager.vcm:
-        #     vcm.set_config(self.config)
 
         for current_round in range(self.starting_round, num_rounds + 1):
             # Train model and replace previous global model
@@ -217,39 +202,40 @@ class Server:
     ) -> Optional[Tuple[Optional[float], EvaluateResultsAndFailures]]:
         """Validate current global model on a number of clients."""
 
-        # # ! this can certainly be done in a nicer way...
         if isinstance(self._client_manager, RemoteClientManager):
-
             results_and_failures = self._round_with_rcm(self.strategy.configure_evaluate,
                                                         evaluate_clients,
                                                         rnd, is_testset)
             results, failures = results_and_failures
         else:
-            # Get clients and their respective instructions from strategy
-            client_instructions = self.strategy.configure_evaluate(
-                rnd=rnd, weights=self.weights, client_manager=self._client_manager
-            )
-            if not client_instructions:
-                log(INFO, "evaluate: no clients sampled, cancel federated evaluation")
-                return None
-            log(
-                DEBUG,
-                "evaluate: strategy sampled %s clients",
-                len(client_instructions),
-            )
+            raise NotImplementedError()
 
-            # Evaluate current global weights on those clients
-            results_and_failures = evaluate_clients(client_instructions)
-            results, failures = results_and_failures
-            log(
-                DEBUG,
-                "evaluate received %s results and %s failures",
-                len(results),
-                len(failures),
-            )
         # Aggregate the evaluation results
-        loss_aggregated, acc_aggregated = self.strategy.aggregate_evaluate(rnd, results, failures)
+        loss_aggregated, acc_aggregated = self.strategy.aggregate_evaluate(rnd,
+                                                                           results,
+                                                                           failures)
         return loss_aggregated, acc_aggregated, results_and_failures
+
+    def fit_round(self, rnd: int) -> Optional[Weights]:
+        """Perform a single round of federated averaging."""
+
+        if isinstance(self._client_manager, RemoteClientManager):
+
+            results, failures = self._round_with_rcm(self.strategy.configure_fit,
+                                                     fit_clients, rnd)
+        else:
+            raise NotImplementedError()
+
+        log(
+            DEBUG,
+            "fit_round received %s results and %s failures",
+            len(results),
+            len(failures),
+        )
+
+        # Return metrics and aggregated training results
+        metrics = [res[1].metrics for res in results]
+        return self.strategy.aggregate_fit(rnd, results, failures), metrics
 
     def _round_with_rcm(self, get_instructions_fn, task_fn, rnd, is_testset: bool = False):
 
@@ -280,16 +266,36 @@ class Server:
 
         # indicate that a new round starts so RCM should wait for VCM to be available
         self._client_manager.start_new_round(num_to_sample)
-        
+
         with tqdm(total=num_to_sample, desc=tqdm_tile) as t:
             while len(results) < num_to_sample:
 
+                if self._client_manager.vcm_failure:
+                    print("> One or more VCMs failed, skipping round...")
+
+                    # tell VCMs to cancel pending jobs
+                    # TODO
+
+                    # shutdown connected clients
+                    all_clients = self._client_manager.all()
+                    dis, err = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
+
+                    # return empty `results` and everything as `failures`
+                    results = []
+                    failures = []
+                    for _ in range(num_to_sample):
+                        failures.append(Exception("Empty client update"))
+
+                    break
+
                 # Get clients and their respective instructions from strategy
                 client_instructions = get_instructions_fn(rnd=rnd, weights=self.weights,
-                                                            client_manager=self._client_manager)
+                                                          client_manager=self._client_manager)
                 if not client_instructions:
-                    log(INFO, "fit_round: no clients sampled, cancel fit")
-                    return None
+                    results = []
+                    failures = []
+                    for _ in range(num_to_sample):
+                        failures.append(Exception("Empty client update"))
 
                 # obtain results
                 results_, failures_ = task_fn(client_instructions)
@@ -305,43 +311,6 @@ class Server:
                 t.update(len(results_))
 
         return results, failures
-
-    def fit_round(self, rnd: int) -> Optional[Weights]:
-        """Perform a single round of federated averaging."""
-
-        # # ! this can certainly be done in a nicer way...
-        if isinstance(self._client_manager, RemoteClientManager):
-
-            results, failures = self._round_with_rcm(self.strategy.configure_fit, fit_clients, rnd)
-
-        else:
-            # Get clients and their respective instructions from strategy
-            client_instructions = self.strategy.configure_fit(
-                rnd=rnd, weights=self.weights, client_manager=self._client_manager
-            )
-            log(
-                DEBUG,
-                "fit_round: strategy sampled %s clients (out of %s)",
-                len(client_instructions),
-                self._client_manager.num_available(),
-            )
-            if not client_instructions:
-                log(INFO, "fit_round: no clients sampled, cancel fit")
-                return None
-
-            # Collect training results from all clients participating in this round
-            results, failures = fit_clients(client_instructions)
-
-        log(
-            DEBUG,
-            "fit_round received %s results and %s failures",
-            len(results),
-            len(failures),
-        )
-
-        # Return metrics and aggregated training results
-        metrics = [res[1].metrics for res in results]
-        return self.strategy.aggregate_fit(rnd, results, failures), metrics
 
     def disconnect_all_clients(self) -> None:
         """Send shutdown signal to all clients."""

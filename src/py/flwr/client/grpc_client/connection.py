@@ -48,7 +48,7 @@ def insecure_grpc_connection(
             ("grpc.max_receive_message_length", max_message_length),
         ],
     )
-    channel.subscribe(on_channel_state_change)
+    # channel.subscribe(on_channel_state_change)
 
     queue: Queue[ClientMessage] = Queue(  # pylint: disable=unsubscriptable-object
         maxsize=1

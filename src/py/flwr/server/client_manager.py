@@ -157,11 +157,18 @@ class RemoteClientManager(SimpleClientManager):
         self.num_vcm = num_vcm
         self.vcm_failure: bool = False
 
-    def wait_for_vcm(self, num_vcm: int, timeout: int = 86400) -> bool:
-        """Block until a VirtualClientManager has connected.
+    def wait_for(self, num_clients: int, timeout: int = 86400) -> bool:
+        """Block until at least `num_clients` are available or until a timeout
+        is reached. Current timeout default: 1 day. If `vcm_failure`=True,
+        then we'll stop waiting (and treat it as a failure inmediately. """
+        with self._cv:
+            return self._cv.wait_for(
+                lambda: (len(self.clients) >= num_clients) or self.vcm_failure, timeout=timeout
+            )
 
-        Current timeout default: 1 day.
-        """
+    def wait_for_vcm(self, num_vcm: int, timeout: int = 86400) -> bool:
+        """Block until a VirtualClientManager has connected. Current timeout
+        default: 1 day. """
 
         print(f"Waiting for VirtualClientManager(s) to connect with server. Expecting {self.num_vcm}...")
         with self._cv:
@@ -195,10 +202,12 @@ class RemoteClientManager(SimpleClientManager):
 
         This method is idempotent.
         """
-        # TODO: when a VCM goes down we should: (1) tell remaining VCMs to reset, (2) end round
         idx = self.vcm.index(vcm)
         print(f"Unregistering the {idx}-th VCM")
         self.vcm.remove(vcm)
+
+        # ! We'll flag as a "failure" when a VCM disconnects since they should only disconnect
+        # ! at the end of the FL experiment (when instructed to do so by the server) - see end of server.fit()
         self.vcm_failure = True
 
         print(f"RMC has {len(self.vcm)}/{self.num_vcm} VCM(s) connected")
@@ -304,6 +313,9 @@ class RemoteClientManager(SimpleClientManager):
         wait = [True] * len(self.vcm)
         clients_wait_for = [0] * len(self.vcm)
         while all(wait):
+            if self.vcm_failure:
+                print("> VCM failure (while is_ready_for_sampling()")
+                return []
             for i, vcm in enumerate(self.vcm):
                 # ask VCM whether clients are ready and how many are online
                 res = vcm.is_ready_for_sampling()
@@ -312,9 +324,13 @@ class RemoteClientManager(SimpleClientManager):
             time.sleep(2)
 
         # ensure the number of clients that VCM said are online
-        # are indeed connected
+        # are indeed connected. Stop waiting if a vcm goes down.
         # print(f"RCM is waiting for {sum(clients_wait_for)} clients")
         self.wait_for(sum(clients_wait_for))
+
+        if self.vcm_failure:
+            print("> VCM failure (while waiting for clients to connect")
+            return []
 
         # Sample clients which meet the criterion
         available_cids = list(self.clients)
