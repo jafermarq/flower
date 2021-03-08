@@ -27,7 +27,7 @@ from flwr.server.grpc_server import flower_service_servicer_vcm as fss_vcm
 def start_insecure_grpc_server(
     client_manager: ClientManager,
     server_address: str,
-    max_concurrent_workers: int = 100,
+    max_concurrent_workers: int = 500,
     max_message_length: int = GRPC_MAX_MESSAGE_LENGTH,
 ) -> grpc.Server:
     """Create grpc server and return registered FlowerServiceServicer instance.
