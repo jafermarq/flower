@@ -313,9 +313,6 @@ class RemoteClientManager(SimpleClientManager):
         wait = [True] * len(self.vcm)
         clients_wait_for = [0] * len(self.vcm)
         while all(wait):
-            if self.vcm_failure:
-                print("> VCM failure (while is_ready_for_sampling()")
-                return []
             for i, vcm in enumerate(self.vcm):
                 # ask VCM whether clients are ready and how many are online
                 res = vcm.is_ready_for_sampling()
@@ -328,9 +325,6 @@ class RemoteClientManager(SimpleClientManager):
         # print(f"RCM is waiting for {sum(clients_wait_for)} clients")
         self.wait_for(sum(clients_wait_for))
 
-        if self.vcm_failure:
-            print("> VCM failure (while waiting for clients to connect")
-            return []
 
         # Sample clients which meet the criterion
         available_cids = list(self.clients)

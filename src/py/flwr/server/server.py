@@ -270,24 +270,6 @@ class Server:
         with tqdm(total=num_to_sample, desc=tqdm_tile) as t:
             while len(results) < num_to_sample:
 
-                if self._client_manager.vcm_failure:
-                    print("> One or more VCMs failed, skipping round...")
-
-                    # tell VCMs to cancel pending jobs
-                    # TODO
-
-                    # shutdown connected clients
-                    all_clients = self._client_manager.all()
-                    dis, err = shutdown(clients=[all_clients[k] for k in all_clients.keys()])
-
-                    # return empty `results` and everything as `failures`
-                    results = []
-                    failures = []
-                    for _ in range(num_to_sample):
-                        failures.append(Exception("Empty client update"))
-
-                    break
-
                 # Get clients and their respective instructions from strategy
                 client_instructions = get_instructions_fn(rnd=rnd, weights=self.weights,
                                                           client_manager=self._client_manager)
@@ -296,6 +278,7 @@ class Server:
                     failures = []
                     for _ in range(num_to_sample):
                         failures.append(Exception("Empty client update"))
+                    return results, failures
 
                 # obtain results
                 results_, failures_ = task_fn(client_instructions)
