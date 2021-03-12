@@ -55,7 +55,7 @@ def insecure_grpc_connection(
     )
     stub = FlowerServiceVCMStub(channel)  # type: ignore
 
-    server_message_iterator: Iterator[RemoteClientManagerMessage] = stub.Join(iter(queue.get, None))
+    server_message_iterator: Iterator[RemoteClientManagerMessage] = stub.Join(iter(queue.get, None), wait_for_ready=True)
 
     receive: Callable[[], RemoteClientManagerMessage] = lambda: next(server_message_iterator)
     send: Callable[[VirtualClientManagerMessage], None] = lambda msg: queue.put(msg, block=False)
