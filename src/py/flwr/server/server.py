@@ -75,6 +75,7 @@ class Server:
         self.config = None
 
         self.eval_every_n = 1
+        self.max_clients_for_eval = float("inf")
         self.skip_validation_eval = False
 
         # init global model
@@ -122,9 +123,10 @@ class Server:
                 else:
                     res_fed = self.evaluate(rnd=current_round, is_testset=False)
                     if res_fed is not None and res_fed[0] is not None:
-                        loss_fed, acc_fed, _ = res_fed
+                        loss_fed, acc_fed, _, all_res = res_fed
                         metrics['loss_fed'] = loss_fed
                         metrics['acc_fed'] = acc_fed
+                        metrics['fed_eval'] = all_res
                         t_round = timeit.default_timer() - start_time
                         log(
                             INFO, "eval(fed): (loss:%s, acc:%s, time:%s)",
@@ -164,9 +166,10 @@ class Server:
             # evaluation on clients
             res_fed = self.evaluate(rnd=current_round, is_testset=True)
             if res_fed is not None and res_fed[0] is not None:
-                loss_fed, acc_fed, _ = res_fed
+                loss_fed, acc_fed, _, all_res = res_fed
                 metrics['loss_fed'] = loss_fed
                 metrics['acc_fed'] = acc_fed
+                metrics['all_eval'] = all_res
                 t_round = timeit.default_timer() - start_time
                 log(
                     INFO, "eval(fed): (%s, %s, %s, %s)",
@@ -214,7 +217,10 @@ class Server:
         loss_aggregated, acc_aggregated = self.strategy.aggregate_evaluate(rnd,
                                                                            results,
                                                                            failures)
-        return loss_aggregated, acc_aggregated, results_and_failures
+        # we also return the raw [num_ex, loss, acc]
+        all_res = [[res.num_examples, res.loss, res.metrics['val_acc'], res.metrics['cid']] for _, res in results]
+
+        return loss_aggregated, acc_aggregated, results_and_failures, all_res
 
     def fit_round(self, rnd: int) -> Optional[Weights]:
         """Perform a single round of federated averaging."""
@@ -258,8 +264,17 @@ class Server:
                 num_to_sample = len(self._client_manager.pool_ids.test_ids)
                 tqdm_tile = "Test"
             else:
-                self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
-                num_to_sample = len(self._client_manager.pool_ids.val_ids)
+
+                # if no clients have been leftout for validation, then we'll use clients from
+                # the pool of clients for training. By default we'll use all of them. The user can
+                # pass an argument during server on_init() to set an upper limit on how many to use
+                if len(self._client_manager.pool_ids.val_ids) == 0:
+                    self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.train_ids)
+                    num_to_sample = min(self.max_clients_for_eval, len(self._client_manager.pool_ids.train_ids))
+                    print(f"No clients left out for validation, using {num_to_sample} clients in the training pool...")
+                else:
+                    self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
+                    num_to_sample = len(self._client_manager.pool_ids.val_ids)
                 tqdm_tile = "Eval"
         else:
             raise NotImplementedError()

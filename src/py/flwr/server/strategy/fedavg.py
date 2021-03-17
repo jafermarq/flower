@@ -197,7 +197,7 @@ class FedAvg(Strategy):
             return None
         return weighted_loss_acc_avg(
             [
-                (evaluate_res.num_examples, evaluate_res.loss, evaluate_res.accuracy)
+                (evaluate_res.num_examples, evaluate_res.loss, evaluate_res.metrics['val_acc'])
                 for _, evaluate_res in results
             ]
         )
