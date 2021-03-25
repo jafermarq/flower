@@ -12,8 +12,8 @@ echo 'Creating new LEAF dataset split.'
 # Format for Flower experiments. Val/train fraction set to 0.25 so validation/total=0.20
 cd ${FLOWER_ROOT}/baselines/flwr_baselines/scripts/femnist
 python split_json_data.py \
---save_root ${OUT_DIR}/femnist\
---leaf_train_json ${LEAF_ROOT}/data/femnist/data/train/all_data_niid_0_keep_2_train_9.json \
---leaf_test_json ${LEAF_ROOT}/data/femnist/data/test/all_data_niid_0_keep_2_test_9.json \
+--save_root ${OUT_DIR}/femnist \
+--leaf_train_jsons_root ${LEAF_ROOT}/data/femnist/data/train/all_data_niid_0_keep_2_train_9.json \
+--leaf_test_jsons_root ${LEAF_ROOT}/data/femnist/data/test/all_data_niid_0_keep_2_test_9.json \
 --val_frac 0.25 
 echo 'Done'
