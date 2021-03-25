@@ -12,7 +12,7 @@ echo 'Creating new LEAF dataset split.'
 # Format for Flower experiments. Val/train fraction set to 0.25 so validation/total=0.20
 cd ${FLOWER_ROOT}/baselines/flwr_baselines/scripts/shakespeare
 python split_json_data.py \
---save_root ${HOME}/datasets/partitions/shakespeare \
+--save_root ${OUT_DIR}/datasets/partitions/shakespeare \
 --leaf_train_json ${LEAF_ROOT}/data/shakespeare/data/train/all_data_niid_0_keep_2_train_9.json \
 --val_frac 0.25 \
 --leaf_test_json ${LEAF_ROOT}/data/shakespeare/data/test/all_data_niid_0_keep_2_test_9.json
