@@ -45,7 +45,7 @@ class FedOpt(FedAvg):
         on_fit_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
         on_evaluate_config_fn: Optional[Callable[[int], Dict[str, Scalar]]] = None,
         accept_failures: bool = True,
-        current_weights: Weights,
+        initial_parameters: Weights,
         eta: float = 1e-1,
         eta_l: float = 1e-1,
         tau: float = 1e-9,
@@ -71,24 +71,25 @@ class FedOpt(FedAvg):
                 Function used to configure validation. Defaults to None.
             accept_failures (bool, optional): Whether or not accept rounds
                 containing failures. Defaults to True.
-            current_weights (Weights): Current set of weights from the server.
+            initial_parameters (Weights): Initial set of parameters from the server.
             eta (float, optional): Server-side learning rate. Defaults to 1e-1.
             eta_l (float, optional): Client-side learning rate. Defaults to 1e-1.
             tau (float, optional): Controls the algorithm's degree of adaptability.
                 Defaults to 1e-9.
         """
         super().__init__(
-            fraction_fit,
-            fraction_eval,
-            min_fit_clients,
-            min_eval_clients,
-            min_available_clients,
-            eval_fn,
-            on_fit_config_fn,
-            on_evaluate_config_fn,
-            accept_failures,
+            fraction_fit=fraction_fit,
+            fraction_eval=fraction_eval,
+            min_fit_clients=min_fit_clients,
+            min_eval_clients=min_eval_clients,
+            min_available_clients=min_available_clients,
+            eval_fn=eval_fn,
+            on_fit_config_fn=on_fit_config_fn,
+            on_evaluate_config_fn=on_evaluate_config_fn,
+            accept_failures=accept_failures,
+            initial_parameters=initial_parameters,
         )
-        self.current_weights = current_weights
+        self.current_weights = initial_parameters
         self.delta_t: Optional[Weights] = None
         self.v_t: Optional[Weights] = None
         self.eta = eta

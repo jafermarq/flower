@@ -46,9 +46,7 @@ def start_insecure_grpc_server(
     )
 
     servicer = fss.FlowerServiceServicer(client_manager)
-    transport_pb2_grpc.add_FlowerServiceServicer_to_server(  # type: ignore
-        servicer, server
-    )
+    transport_pb2_grpc.add_FlowerServiceServicer_to_server(servicer, server)
 
     # Service RemoteClientManager <--> VirtualClientManager
     servicer = fss_vcm.FlowerServiceServicerVCM(client_manager)
