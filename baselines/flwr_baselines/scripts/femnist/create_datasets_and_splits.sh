@@ -13,7 +13,7 @@ echo 'Creating new LEAF dataset split.'
 cd ${FLOWER_ROOT}/baselines/flwr_baselines/scripts/femnist
 python split_json_data.py \
 --save_root ${OUT_DIR}/femnist \
---leaf_train_jsons_root ${LEAF_ROOT}/data/femnist/data/train/all_data_niid_0_keep_2_train_9.json \
---leaf_test_jsons_root ${LEAF_ROOT}/data/femnist/data/test/all_data_niid_0_keep_2_test_9.json \
+--leaf_train_jsons_root ${LEAF_ROOT}/data/femnist/data/train \
+--leaf_test_jsons_root ${LEAF_ROOT}/data/femnist/data/test \
 --val_frac 0.25 
 echo 'Done'
