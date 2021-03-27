@@ -262,8 +262,13 @@ class Server:
         elif task_fn == evaluate_clients:
             # we ensure we sample all clients for val/test
             if is_testset:
-                self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.test_ids)
-                num_to_sample = len(self._client_manager.pool_ids.test_ids)
+                if len(self._client_manager.pool_ids.test_ids) == 0:
+                    self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.train_ids)
+                    num_to_sample = len(self._client_manager.pool_ids.train_ids)
+                    print(f"No clients left out for test, using {num_to_sample} clients in the training pool...")
+                else:
+                    self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.test_ids)
+                    num_to_sample = len(self._client_manager.pool_ids.test_ids)
                 tqdm_tile = "Test"
             else:
 
@@ -273,11 +278,11 @@ class Server:
                 if len(self._client_manager.pool_ids.val_ids) == 0:
                     self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.train_ids)
                     num_to_sample = min(self.max_clients_for_eval, len(self._client_manager.pool_ids.train_ids))
-                    print(f"No clients left out for validation, using {num_to_sample} clients in the training pool...")
+                    # print(f"No clients left out for validation, using {num_to_sample} clients in the training pool...")
                 else:
                     self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
                     num_to_sample = len(self._client_manager.pool_ids.val_ids)
-                tqdm_tile = "Eval"
+                tqdm_tile = "Validation"
         else:
             raise NotImplementedError()
 
