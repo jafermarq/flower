@@ -17,6 +17,7 @@
 
 import concurrent.futures
 import timeit
+import logging
 from logging import DEBUG, INFO
 from typing import List, Optional, Tuple, cast, Callable, Dict
 from tqdm import tqdm
@@ -87,6 +88,14 @@ class Server:
 
         self.on_init()
 
+    def setup_logger(self, out_dir: str) -> None:
+        """Generates basic config for logger. the main purpose is to
+        save whatever is outputed to a path generated before launching the server. """
+        string_to_input = '%(asctime)s - %(levelname)s'
+        string_to_input += "| %(filename)s:%(lineno)d | %(message)s"
+        logging.basicConfig(filename=out_dir+"/server.log", filemode='w',
+                            format=string_to_input, level=DEBUG)
+
     def client_manager(self) -> ClientManager:
         """Return ClientManager."""
         return self._client_manager
@@ -156,7 +165,7 @@ class Server:
                 metrics['acc_cen'], metrics['loss_cen'] = acc_cen, loss_cen
                 t_round = timeit.default_timer() - start_time
                 log(
-                    INFO, "fit progress: (%s, %s, %s, %s)",
+                    INFO, "Test (centralized): (%s, %s, %s, %s)",
                     current_round, loss_cen,
                     acc_cen, t_round,
                 )
@@ -172,7 +181,7 @@ class Server:
                 metrics['all_eval'] = all_res
                 t_round = timeit.default_timer() - start_time
                 log(
-                    INFO, "eval(fed): (%s, %s, %s, %s)",
+                    INFO, "Test (federated): (%s, %s, %s, %s)",
                     current_round, loss_fed,
                     acc_fed, t_round,
                 )

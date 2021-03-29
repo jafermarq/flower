@@ -21,12 +21,13 @@ import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from math import ceil
+from logging import DEBUG, INFO
 
 from .client_proxy import ClientProxy
 from .virtual_client_manager_proxy import VirtualClientManagerProxy
 from .criterion import Criterion
 from flwr.common import WakeUpClientsIns, GetPoolSizeRes
-
+from flwr.common.logger import log
 
 class ClientManager(ABC):
     """Abstract base class for managing Flower clients."""
@@ -203,14 +204,14 @@ class RemoteClientManager(SimpleClientManager):
         This method is idempotent.
         """
         idx = self.vcm.index(vcm)
-        print(f"Unregistering the {idx}-th VCM")
+        log(DEBUG, f"Unregistering the {idx}-th VCM")
         self.vcm.remove(vcm)
 
         # ! We'll flag as a "failure" when a VCM disconnects since they should only disconnect
         # ! at the end of the FL experiment (when instructed to do so by the server) - see end of server.fit()
         self.vcm_failure = True
 
-        print(f"RMC has {len(self.vcm)}/{self.num_vcm} VCM(s) connected")
+        log(DEBUG, f"RMC has {len(self.vcm)}/{self.num_vcm} VCM(s) connected")
         with self._cv:
             self._cv.notify_all()
 
@@ -222,7 +223,7 @@ class RemoteClientManager(SimpleClientManager):
         train_ids_len = len(self.pool_ids.train_ids)
         val_ids_len = None if self.pool_ids.val_ids is None else len(self.pool_ids.val_ids)
         test_ids_len = None if self.pool_ids.test_ids is None else len(self.pool_ids.test_ids)
-        print(f"Received --> pool_ids = List[train={train_ids_len}," +
+        log(INFO, f"Received --> pool_ids = List[train={train_ids_len}," +
               f"val={val_ids_len},test={test_ids_len}] IDs.")
 
     def _cids_list_to_string(self, cids: List[int]):
@@ -266,7 +267,7 @@ class RemoteClientManager(SimpleClientManager):
             cids = random.sample(self.ids_to_use, clients_per_round)
             self.wakeup_clients(cids)
         else:
-            print("> List doesn't contain cids..")
+            log(DEBUG, "> List doesn't contain cids..")
 
     def update_id_list_to_use(self, ids: List[int]) -> None:
         """ Updates the list of client ids to wake up ahead of a call to
@@ -276,7 +277,7 @@ class RemoteClientManager(SimpleClientManager):
 
     def shutdown_vcm(self) -> None:
         """Tells VCM to shutdown."""
-        print("Telling VCMs to shutdown...")
+        log(DEBUG, "Telling VCMs to shutdown...")
         for vcm in self.vcm:
             _ = vcm.disconnect()
 
@@ -290,10 +291,10 @@ class RemoteClientManager(SimpleClientManager):
             for i, vcm in enumerate(self.vcm):
                 res = vcm.set_config(config)
                 if res != 4:  # 4 == ACK from proto
-                    print(f"Error sending config to vcm_{i}. Disconecting VCM")
+                    log(DEBUG, f"Error sending config to vcm_{i}. Disconecting VCM")
                     self.unregister_vcm(vcm)
                 else:
-                    print(f"Seding config to vcm_{i}: ACK")
+                    log(DEBUG, f"Seding config to vcm_{i}: ACK")
             self.get_virtual_pool_ids()
 
     def sample(
