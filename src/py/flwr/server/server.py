@@ -279,6 +279,8 @@ class Server:
                     self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.test_ids)
                     num_to_sample = len(self._client_manager.pool_ids.test_ids)
                 tqdm_tile = "Test"
+                # Tells clients to use their test set
+                self.strategy.eval_test_set = True
             else:
 
                 # if no clients have been leftout for validation, then we'll use clients from
@@ -292,6 +294,9 @@ class Server:
                     self._client_manager.update_id_list_to_use(self._client_manager.pool_ids.val_ids)
                     num_to_sample = len(self._client_manager.pool_ids.val_ids)
                 tqdm_tile = "Validation"
+
+                # Tells clients to use their validation set
+                self.strategy.eval_test_set = False
         else:
             raise NotImplementedError()
 

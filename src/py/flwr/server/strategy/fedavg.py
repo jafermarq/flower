@@ -90,6 +90,7 @@ class FedAvg(Strategy):
         self.on_evaluate_config_fn = on_evaluate_config_fn
         self.accept_failures = accept_failures
         self.initial_parameters = initial_parameters
+        self.eval_test_set = False
 
     def __repr__(self) -> str:
         rep = f"FedAvg(accept_failures={self.accept_failures})"
@@ -154,6 +155,10 @@ class FedAvg(Strategy):
         # Parameters and config
         parameters = weights_to_parameters(weights)
         config = {}
+
+        # so client knows which of its partitions to use val/test
+        config["is_test"] = self.eval_test_set
+
         if self.on_evaluate_config_fn is not None:
             # Custom evaluation config function provided
             config = self.on_evaluate_config_fn(rnd)
