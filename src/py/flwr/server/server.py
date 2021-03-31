@@ -121,14 +121,14 @@ class Server:
             if weights_prime is not None:
                 self.weights = weights_prime
 
-            metrics = {'acc_cen': None, 'loss_cen': None,
-                       'acc_fed': None, 'loss_fed': None}
-
-            if current_round % self.eval_every_n == 0:
+            metrics = None
+            # validation stage every N rounds, but always after first round and in the last round of training
+            if current_round % self.eval_every_n == 0 or current_round == 1 or current_round == num_rounds:
+                metrics = {'acc_cen': None, 'loss_cen': None,
+                           'acc_fed': None, 'loss_fed': None}
                 # Evaluate on validation set (always federated)
                 if self.skip_validation_eval:
                     print("> Undefined Validation split (skipping round eval...)")
-                    t_round = timeit.default_timer() - start_time
                 else:
                     res_fed = self.evaluate(rnd=current_round, is_testset=False)
                     if res_fed is not None and res_fed[0] is not None:
@@ -147,6 +147,9 @@ class Server:
                         history.add_accuracy_distributed(
                             rnd=current_round, acc=cast(float, acc_fed)
                         )
+            else:
+                log(INFO, f"Skipping validation round (happens every {self.eval_every_n} rounds)")
+                t_round = timeit.default_timer() - start_time
 
             # Round ended, run post round stages
             args = {'current_round': current_round, 'server_metrics': metrics,
@@ -156,13 +159,15 @@ class Server:
             self.on_round_end(args)
 
         # evaluate on test set
+        metrics = {'acc_cen_test': None, 'loss_cen_test': None,
+                    'acc_fed_test': None, 'loss_fed_test': None}
         print("> Training ended. Evaluating on test set")
         if self.strategy.eval_fn is not None:
             # centralized evaluation
             res_cen = self.strategy.evaluate(weights=self.weights)
             if res_cen is not None:
                 loss_cen, acc_cen = res_cen
-                metrics['acc_cen'], metrics['loss_cen'] = acc_cen, loss_cen
+                metrics['acc_cen_test'], metrics['loss_cen_test'] = acc_cen, loss_cen
                 t_round = timeit.default_timer() - start_time
                 log(
                     INFO, "Test (centralized): (%s, %s, %s, %s)",
@@ -176,9 +181,9 @@ class Server:
             res_fed = self.evaluate(rnd=current_round, is_testset=True)
             if res_fed is not None and res_fed[0] is not None:
                 loss_fed, acc_fed, _, all_res = res_fed
-                metrics['loss_fed'] = loss_fed
-                metrics['acc_fed'] = acc_fed
-                metrics['all_eval'] = all_res
+                metrics['loss_fed_test'] = loss_fed
+                metrics['acc_fed_test'] = acc_fed
+                metrics['all_eval_test'] = all_res
                 t_round = timeit.default_timer() - start_time
                 log(
                     INFO, "Test (federated): (%s, %s, %s, %s)",
@@ -227,7 +232,7 @@ class Server:
                                                                            results,
                                                                            failures)
         # we also return the raw [num_ex, loss, acc]
-        all_res = [[res.num_examples, res.loss, res.metrics['val_acc'], res.metrics['cid']] for _, res in results]
+        all_res = [{'num_examples': res.num_examples, 'loss': res.loss, **res.metrics} for _, res in results]
 
         return loss_aggregated, acc_aggregated, results_and_failures, all_res
 
