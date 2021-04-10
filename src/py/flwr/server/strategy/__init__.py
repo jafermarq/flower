@@ -26,6 +26,7 @@ from .fedfs_v0 import FedFSv0 as FedFSv0
 from .fedfs_v1 import FedFSv1 as FedFSv1
 from .qffedavg import QffedAvg as QffedAvg
 from .strategy import Strategy as Strategy
+from .feddelay import FedDelay as FedDelay
 
 __all__ = [
     "DefaultStrategy",
@@ -38,5 +39,6 @@ __all__ = [
     "FedFSv1",
     "QffedAvg",
     "Strategy",
-    "FedAdagradOriginal"
+    "FedAdagradOriginal",
+    "FedDelay"
 ]
