@@ -165,7 +165,10 @@ class FedDelay(FedAvg):
         # being learnt in parallel). We need to deal with this situation. 
         # one simple approach is to let each model being used multiple times
 
-        model_idx = [random.randrange(start=0, stop=len(parameters)-1) for _ in range(len(clients))]
+        if len(parameters) > 1:
+            model_idx = [random.randrange(start=0, stop=len(parameters)-1) for _ in range(len(clients))]
+        else:
+            model_idx = [0 for _ in range(len(clients))]
         client_ins_pairs = []
         for i in range(len(clients)):
 
