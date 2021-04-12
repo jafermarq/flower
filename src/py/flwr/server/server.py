@@ -115,6 +115,8 @@ class Server:
                                          " This is needed to initialize the VCM(s).")
         self._client_manager.init_upon_vcm_connects(self.config)
 
+        current_round = self.starting_round
+
         for current_round in range(self.starting_round, num_rounds + 1):
             # Train model and replace previous global model
             weights_prime, client_metrics = self.fit_round(rnd=current_round)
@@ -201,7 +203,7 @@ class Server:
         args = {'current_round': current_round+1, 'server_metrics': metrics,
                 'weights': self.weights, 't_round': t_round}
 
-        self.on_round_end(args)
+        self.on_round_end(args, is_test_eval=True)
 
         # Bookkeeping
         end_time = timeit.default_timer()
