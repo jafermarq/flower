@@ -265,8 +265,7 @@ class RemoteClientManager(SimpleClientManager):
     def shutdown_vcm(self) -> None:
         """Tells VCM to shutdown."""
         log(DEBUG, "Telling VCMs to shutdown...")
-        for vcm in self.vcm:
-            _ = vcm.disconnect()
+        self.vcm.disconnect()
 
     def init_upon_vcm_connects(self, config: dict) -> None:
         """Waits for VCMs to connect with Server/RCM. Then sends the config to
@@ -310,9 +309,8 @@ class RemoteClientManager(SimpleClientManager):
         # are indeed connected. Stop waiting if a vcm goes down.
         self.wait_for(clients_wait_for)
 
-
         # Sample clients which meet the criterion
-        available_cids = list(self.clients)
+        available_cids = list(self.clients)[:clients_wait_for]  # this gives extra safety (although it shouldn't be necessary)
         if criterion is not None:
             # TODO: this needs to be revisited (is it even ever used?)
             print("> Revisit the use of `criterion` for RemoteClientManager")
