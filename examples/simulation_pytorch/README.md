@@ -32,3 +32,9 @@ The command below will assign each client 2 CPU threads. If your system does not
 ```bash
 $ python main.py --num_client_cpus 2 # note that `num_client_cpus` should be <= the number of threads in your system.
 ```
+
+# Test resuming functionality
+
+When you run the code as above (e.g.`python main.py`) on each call to the server's evaluate method, a pickle is saved containing the state of the global model, as well as other metadata. If you run the code passing flag `--resume` followed by the path to the pickle you want to resume from, the code will: (1) initialise the global model with that in the pickle; (2) set the server's starting round to that found in the pickle; and, (3) pass one of the variables in the checkpoint as part of the instructions to each client (i.e. via `configure_fit()`) using a custmo strategy.
+
+There are other ways to achieve this same functionality without needing a custom strategy. For example, the whole metadata (except the model state) in the checkpoint could be passed to `fit_config()` in `main.py` (in this way a custom strategy won't be needed -- although it will certainly give more flexibility for more complicated settings). Likewise, a custom server is not strictly needed. A (custom) strategy could be implemented to keep track of the (real) round count and ignore the round index shown (and logged) by the server.

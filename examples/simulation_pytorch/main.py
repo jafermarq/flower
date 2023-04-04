@@ -1,4 +1,5 @@
 import argparse
+import pickle
 import flwr as fl
 from flwr.common.typing import Scalar
 import ray
@@ -8,14 +9,20 @@ import numpy as np
 from collections import OrderedDict
 from pathlib import Path
 from typing import Dict, Callable, Optional, Tuple, List
+
+
+from flwr.server.client_manager import SimpleClientManager
+
 from dataset_utils import get_cifar_10, do_fl_partitioning, get_dataloader
 from utils import Net, train, test
+from with_resume import FlowerServerResumable, CustomFedAvg
 
 
 parser = argparse.ArgumentParser(description="Flower Simulation with PyTorch")
 
 parser.add_argument("--num_client_cpus", type=int, default=1)
-parser.add_argument("--num_rounds", type=int, default=5)
+parser.add_argument("--num_rounds", type=int, default=10)
+parser.add_argument("--resume", type=str, default="", help='path to pickle containing checkpoint')
 
 
 # Flower client, adapted from Pytorch quickstart example
@@ -38,7 +45,7 @@ class FlowerClient(fl.client.NumPyClient):
         set_params(self.net, parameters)
 
         # Load data for this client and get trainloader
-        num_workers = int(ray.get_runtime_context().get_assigned_resources()["CPU"])
+        num_workers = 2 #int(ray.get_runtime_context().get_assigned_resources()["CPU"])
         trainloader = get_dataloader(
             self.fed_dir,
             self.cid,
@@ -60,7 +67,7 @@ class FlowerClient(fl.client.NumPyClient):
         set_params(self.net, parameters)
 
         # Load data for this client and get trainloader
-        num_workers = int(ray.get_runtime_context().get_assigned_resources()["CPU"])
+        num_workers = 2 #int(ray.get_runtime_context().get_assigned_resources()["CPU"])
         valloader = get_dataloader(
             self.fed_dir, self.cid, is_train=False, batch_size=50, workers=num_workers
         )
@@ -116,11 +123,29 @@ def get_evaluate_fn(
         testloader = torch.utils.data.DataLoader(testset, batch_size=50)
         loss, accuracy = test(model, testloader, device=device)
 
+        # here i'm simulating saving a checkpoint cointaining some useful data alongside the model
+        checkpoint = {'state_dict': model.cpu().state_dict(), 'sumo_state': torch.randn(8,1),
+                      'last_loss': loss, 'round_number': server_round}
+
+        with open(f'state_round_{server_round}.pkl', 'wb') as f:  # open a text file
+            pickle.dump(checkpoint, f) # serialize the list
+
         # return statistics
         return loss, {"accuracy": accuracy}
 
     return evaluate
 
+
+def load_checkpoint(path_to_pickle):
+    from flwr.common import ndarrays_to_parameters
+    with open(path_to_pickle, 'rb') as f:
+        data = pickle.load(f)
+    print(data.keys())
+    # load model state
+    state_dict = data.pop('state_dict')
+    init_params = ndarrays_to_parameters([value for value in state_dict.values()])
+
+    return init_params, data
 
 # Start simulation (a _default server_ will be created)
 # This example does:
@@ -153,8 +178,14 @@ if __name__ == "__main__":
         train_path, pool_size=pool_size, alpha=1000, num_classes=10, val_ratio=0.1
     )
 
+
+    initial_parameters = None
+    resume_checkpoint = None
+    if args.resume:
+        initial_parameters, resume_checkpoint = load_checkpoint(args.resume)
+
     # configure the strategy
-    strategy = fl.server.strategy.FedAvg(
+    strategy = CustomFedAvg(
         fraction_fit=0.1,
         fraction_evaluate=0.1,
         min_fit_clients=10,
@@ -162,6 +193,8 @@ if __name__ == "__main__":
         min_available_clients=pool_size,  # All clients should be available
         on_fit_config_fn=fit_config,
         evaluate_fn=get_evaluate_fn(testset),  # centralised evaluation of global model
+        initial_parameters=initial_parameters, # pass inital parameters for strategy
+        resume_checkpoint=resume_checkpoint # pass checkpoint with state
     )
 
     def client_fn(cid: str):
@@ -171,12 +204,16 @@ if __name__ == "__main__":
     # (optional) specify Ray config
     ray_init_args = {"include_dashboard": False}
 
+
+    # start round (if no checkpoint is passed, first round is #1)
+    start_round = 1 if resume_checkpoint is None else resume_checkpoint.get('round_number',1)
     # start simulation
     fl.simulation.start_simulation(
         client_fn=client_fn,
         num_clients=pool_size,
+        server=FlowerServerResumable(start_round=start_round, client_manager=SimpleClientManager(), strategy=strategy), # start from specific round
         client_resources=client_resources,
-        config=fl.server.ServerConfig(num_rounds=args.num_rounds),
+        config=fl.server.ServerConfig(num_rounds=args.num_rounds + start_round-1),
         strategy=strategy,
         ray_init_args=ray_init_args,
     )
