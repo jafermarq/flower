@@ -1,6 +1,5 @@
-FROM ubuntu:22.04
+FROM amd64/ubuntu:22.04
 
-# https://code.visualstudio.com/docs/remote/containers-advanced#_creating-a-nonroot-user
 ARG USERNAME=flwr-docker
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
