@@ -49,10 +49,10 @@ RUN pyenv global $PYTHON_GLOBAL
 
 # Setup poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
-RUN echo 'export PATH="/Users/javier/.local/bin:$PATH"' >> ~/.bashrc
+RUN echo 'export PATH="/home/$USERNAME/.local/bin:$PATH"' >> ~/.bashrc
 
 # clone flower repo
-RUN git clone https://github.com/jafermarq/flower.git 
+RUN git clone -b $BRANCH https://github.com/adap/flower.git
 WORKDIR $HOME/flower
 
 # setup poetry for flower
