@@ -3,8 +3,6 @@ FROM amd64/ubuntu:22.04
 ARG USERNAME=flwr-docker
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-ARG PYTHON_GLOBAL=3.9.17
-ARG BRANCH=main
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -25,19 +23,20 @@ RUN python -m pip install \
 
 USER $USERNAME
 ENV PATH="/home/$USERNAME/.local/bin:${PATH}"
-ENV HOME="/home/$USERNAME/"
+ENV HOME="/home/$USERNAME"
 WORKDIR $HOME
 
 # Set Pyenv
-RUN curl https://pyenv.run | bash
+RUN git clone --depth 1 --branch v2.3.22 https://github.com/pyenv/pyenv.git ~/.pyenv
 ENV PYENV_ROOT="$HOME/.pyenv"
 ENV PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
 
 # Install a bunch of Python versions
 RUN pyenv install 3.7.17
 RUN pyenv install 3.8.17
-RUN pyenv install $PYTHON_GLOBAL
 RUN pyenv install 3.10.12
+ARG PYTHON_GLOBAL=3.9.17
+RUN pyenv install $PYTHON_GLOBAL
 
 # now add to .bahsrc
 RUN echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
@@ -52,6 +51,7 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 RUN echo 'export PATH="/home/$USERNAME/.local/bin:$PATH"' >> ~/.bashrc
 
 # clone flower repo
+ARG BRANCH=main
 RUN git clone -b $BRANCH https://github.com/adap/flower.git
 WORKDIR $HOME/flower
 
