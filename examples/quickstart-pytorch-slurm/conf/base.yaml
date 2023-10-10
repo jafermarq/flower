@@ -1,0 +1,24 @@
+---
+
+defaults:
+  - model: basic
+
+client:
+  wait_for_server: 15 # wait for this many seconds before starting the client
+  client:
+    _target_: client.FlowerClient
+    _recursive_: false # tell Hydra not to instantiate child nodes (for instance to give us control when the model object is instantiated)
+    local_epochs: 1
+    net_config: ${model} # a refenence to the model node in the config
+    device: cpu # or cuda:0
+
+server:
+  address: ??? # this indicates you must supply this when running the code.
+  port: 6379
+  num_rounds: 3
+  device: cpu # or cuda:0
+  fit_config: # settings the server communicates to the clients to paremeterise their `fit()` method
+    lr: 0.001
+    momentum: 0.9
+  strategy:
+    _target_: flwr.server.strategy.FedAvg

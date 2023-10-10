@@ -1,88 +1,41 @@
 import warnings
-import argparse
 from time import sleep
 from collections import OrderedDict
-
+import hydra
+from hydra.core.hydra_config import HydraConfig
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf
 
 import flwr as fl
+from tqdm import tqdm
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import Compose, Normalize, ToTensor
-from tqdm import tqdm
 
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--server_address",
-    type=str,
-    required=True,
-    help=f"gRPC server IP address"
-)
-parser.add_argument(
-    "--server_port",
-    type=int,
-    default=6379,
-    help=f"gRPC server port"
-)
-parser.add_argument(
-    "--wait_for_server",
-    type=int,
-    default=15,
-    help=f"Waits this many secons before running `start_client`"
-)
-
-
-# #############################################################################
-# 1. Regular PyTorch pipeline: nn.Module, train, test, and DataLoader
-# #############################################################################
 
 warnings.filterwarnings("ignore", category=UserWarning)
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
-class Net(nn.Module):
-    """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
-
-    def __init__(self) -> None:
-        super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 4 * 4, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 4 * 4)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        return self.fc3(x)
-
-
-def train(net, trainloader, epochs):
+def train(net, trainloader, epochs, device, train_settings):
     """Train the model on the training set."""
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    optimizer = torch.optim.SGD(net.parameters(), lr=train_settings["lr"], momentum=train_settings["momentum"])
     for _ in range(epochs):
         for images, labels in tqdm(trainloader):
             optimizer.zero_grad()
-            criterion(net(images.to(DEVICE)), labels.to(DEVICE)).backward()
+            criterion(net(images.to(device)), labels.to(device)).backward()
             optimizer.step()
 
 
-def test(net, testloader):
+def test(net, testloader, device):
     """Validate the model on the test set."""
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
     with torch.no_grad():
         for images, labels in tqdm(testloader):
-            outputs = net(images.to(DEVICE))
-            labels = labels.to(DEVICE)
+            outputs = net(images.to(device))
+            labels = labels.to(device)
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
     accuracy = correct / len(testloader.dataset)
@@ -94,49 +47,67 @@ def load_data():
     trf = Compose([ToTensor(), Normalize((0.1307,), (0.3081,))])
     trainset = MNIST("./data", train=True, download=True, transform=trf)
     testset = MNIST("./data", train=False, download=True, transform=trf)
-    return DataLoader(trainset, batch_size=32, shuffle=True), DataLoader(testset)
+    trainloader = DataLoader(trainset, batch_size=32, shuffle=True, num_workers=4)
+    testloader = DataLoader(testset, batch_size=32, num_workers=4)
 
-
-# #############################################################################
-# 2. Federation of the pipeline with Flower
-# #############################################################################
-
-# Load model and data (simple CNN, MNIST)
-net = Net().to(DEVICE)
-trainloader, testloader = load_data()
+    return trainloader, testloader
 
 
 # Define Flower client
 class FlowerClient(fl.client.NumPyClient):
+    def __init__(self, net_config, trainloader, testloader, local_epochs, device):
+        self.net = instantiate(net_config)
+        self.trainloader = trainloader
+        self.testloader = testloader
+        self.local_epochs = local_epochs
+        self.device = device
+
     def get_parameters(self, config):
-        return [val.cpu().numpy() for _, val in net.state_dict().items()]
+        return [val.cpu().numpy() for _, val in self.net.state_dict().items()]
 
     def set_parameters(self, parameters):
-        params_dict = zip(net.state_dict().keys(), parameters)
+        params_dict = zip(self.net.state_dict().keys(), parameters)
         state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-        net.load_state_dict(state_dict, strict=True)
+        self.net.load_state_dict(state_dict, strict=True)
 
     def fit(self, parameters, config):
         self.set_parameters(parameters)
-        train(net, trainloader, epochs=1)
-        return self.get_parameters(config={}), len(trainloader.dataset), {}
+        train(self.net, self.trainloader, epochs=self.local_epochs,
+              device=self.device, train_settings=config)
+        return self.get_parameters(config={}), len(self.trainloader.dataset), {}
 
     def evaluate(self, parameters, config):
         self.set_parameters(parameters)
-        loss, accuracy = test(net, testloader)
-        return loss, len(testloader.dataset), {"accuracy": accuracy}
+        loss, accuracy = test(self.net, self.testloader, device=self.device)
+        return loss, len(self.testloader.dataset), {"accuracy": accuracy}
 
 
-args = parser.parse_args()
-print(args)
+@hydra.main(config_path="conf", config_name="base", version_base=None)
+def main(cfg: DictConfig) -> None:
 
-# Let's delay the start of the client for a few seconds
-# to ensure the server is up and ready to accept connections
-# from clients
-sleep(args.wait_for_server)
+    # Print config structured as YAML
+    print(OmegaConf.to_yaml(cfg))
 
-# Start Flower client
-fl.client.start_numpy_client(
-    server_address=f"{args.server_address}:{args.server_port}",
-    client=FlowerClient(),
-)
+    # Load the dataset
+    trainloader, testloader = load_data()
+
+    # Let's delay the start of the client for a few seconds
+    # to ensure the server is up and ready to accept connections
+    # from clients
+    sleep(cfg.client.wait_for_server)
+
+
+    # Instantiate client object, note that here I only need to pass the arguemtns
+    # that were not specified in the config. Those that were, can still be overriden.
+    client = instantiate(cfg.client.client,
+                         trainloader=trainloader,
+                         testloader=testloader)
+
+    # Start Flower client
+    fl.client.start_numpy_client(
+        server_address=f"{cfg.server.address}:{cfg.server.port}",
+        client=client,
+    )
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,3 @@
+_target_: models.ResNet
+in_channels: 1
+num_classes: 10
