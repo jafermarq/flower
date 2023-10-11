@@ -59,6 +59,18 @@ python client.py server.address='localhost'
 python client.py server.address='localhost'
 ```
 
+Each time you run these commands, Hydra will generate a new output directory where the config used and the logs are dumped. By default, all this will go to a directory named `outputs/<server-or-client>/<date>/<time>`. For example, executing the above lines of code would generate a directory structure for `outputs` as follows:
+
+```
+outputs
+   |
+   ├── server
+   |      └── date/time/<logs and config>  
+   └── client
+          ├── date/time/<logs and config>
+          └── date/time/<logs and config>
+```
+
 
 ## Run Federated Learning with PyTorch and Flower (in SLURM)
 
