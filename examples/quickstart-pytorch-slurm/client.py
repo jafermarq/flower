@@ -1,5 +1,5 @@
 import logging
-from time import sleep
+from time import sleep, time
 from collections import OrderedDict
 import hydra
 from hydra.core.hydra_config import HydraConfig
@@ -34,12 +34,14 @@ class FlowerClient(fl.client.NumPyClient):
 
     def fit(self, parameters, config):
         log.info("Fit beings")
+        t_start = time()
         log.info(f"Config received: {config}")
         self.set_parameters(parameters)
         train(self.net, self.trainloader, epochs=self.local_epochs,
               device=self.device, train_settings=config)
-        log.info("Fit ends")
-        return self.get_parameters(config={}), len(self.trainloader.dataset), {}
+        t_end = time() - t_start
+        log.info(f"Fit ends (too: {t_end:.2f} s)")
+        return self.get_parameters(config={}), len(self.trainloader.dataset), {'time_train': t_end}
 
     def evaluate(self, parameters, config):
         self.set_parameters(parameters)
