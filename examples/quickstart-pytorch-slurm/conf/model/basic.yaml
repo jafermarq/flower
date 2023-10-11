@@ -1,0 +1,3 @@
+_target_: models.Net
+in_channels: 1
+conv1_channels: 6

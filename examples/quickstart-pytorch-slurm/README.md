@@ -9,6 +9,7 @@ Running this example in itself is quite easy.
 
 Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
 
+
 ```shell
 git clone --depth=1 https://github.com/jafermarq/flower.git && mv flower/examples/quickstart-pytorch-slurm . && rm -rf flower && cd quickstart-pytorch-slurm
 ```
@@ -20,8 +21,12 @@ This will create a new directory called `quickstart-pytorch-slurm` containing th
 -- requirements.txt
 -- client.py
 -- server.py
+-- models.py
+-- dataset.py
 -- README.md
 ```
+
+In addition, the `conf/` directory contains [Hydra](https://hydra.cc/) `YAML` files that can be used to paremterise both the server and the clients.
 
 ### Installing Dependencies
 
@@ -36,6 +41,22 @@ source activate flower-slurm
 
 # install dependencies
 pip install -r requirements.txt
+```
+
+## Running this example on your local machine
+
+You can run the code in this example directly on your machine (i.e. without using SLURM). In order to do so you should first launch the server, then the clients.
+
+```bash
+
+# launch the server with default settings and using localhost as address
+python server.py address='localhost' # change address accordingtly
+
+# Open a new terminal and launch a client
+python client.py server.address='localhost'
+
+# Then open a new terminal and launch another (launch more if you'd like to)
+python client.py server.address='localhost'
 ```
 
 
@@ -72,12 +93,12 @@ for ((i = 1; i <= worker_num; i++)); do
   node_i=${nodes_array[$i]}
   echo "Starting Client $i at $node_i"
   # launch clients but delay call to python client (so there is time for the server to start up)
-  srun --nodes=1 --ntasks=1 -w "$node_i" python client.py --server_address $ip --wait_for_server 15 &
+  srun --nodes=1 --ntasks=1 -w "$node_i" python client.py server.address=$ip wait_for_server=15 &
 done
 
 # Launch server
 echo "Starting server at $ip"
-python server.py --server_address $ip
+python server.py address=$ip
 
 ```
 
