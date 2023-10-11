@@ -1,4 +1,4 @@
-import warnings
+import logging
 from time import sleep
 from collections import OrderedDict
 import hydra
@@ -7,51 +7,12 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 import flwr as fl
-from tqdm import tqdm
 import torch
-from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
-from torchvision.transforms import Compose, Normalize, ToTensor
 
+from dataset import load_data
+from models import train, test
 
-warnings.filterwarnings("ignore", category=UserWarning)
-
-
-def train(net, trainloader, epochs, device, train_settings):
-    """Train the model on the training set."""
-    criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=train_settings["lr"], momentum=train_settings["momentum"])
-    for _ in range(epochs):
-        for images, labels in tqdm(trainloader):
-            optimizer.zero_grad()
-            criterion(net(images.to(device)), labels.to(device)).backward()
-            optimizer.step()
-
-
-def test(net, testloader, device):
-    """Validate the model on the test set."""
-    criterion = torch.nn.CrossEntropyLoss()
-    correct, loss = 0, 0.0
-    with torch.no_grad():
-        for images, labels in tqdm(testloader):
-            outputs = net(images.to(device))
-            labels = labels.to(device)
-            loss += criterion(outputs, labels).item()
-            correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-    accuracy = correct / len(testloader.dataset)
-    return loss, accuracy
-
-
-def load_data():
-    """Load CIFAR-10 (training and test set)."""
-    trf = Compose([ToTensor(), Normalize((0.1307,), (0.3081,))])
-    trainset = MNIST("./data", train=True, download=True, transform=trf)
-    testset = MNIST("./data", train=False, download=True, transform=trf)
-    trainloader = DataLoader(trainset, batch_size=32, shuffle=True, num_workers=4)
-    testloader = DataLoader(testset, batch_size=32, num_workers=4)
-
-    return trainloader, testloader
-
+log = logging.getLogger(__name__)
 
 # Define Flower client
 class FlowerClient(fl.client.NumPyClient):
@@ -61,6 +22,7 @@ class FlowerClient(fl.client.NumPyClient):
         self.testloader = testloader
         self.local_epochs = local_epochs
         self.device = device
+        log.info("Client creation completled")
 
     def get_parameters(self, config):
         return [val.cpu().numpy() for _, val in self.net.state_dict().items()]
@@ -71,9 +33,12 @@ class FlowerClient(fl.client.NumPyClient):
         self.net.load_state_dict(state_dict, strict=True)
 
     def fit(self, parameters, config):
+        log.info("Fit beings")
+        log.info(f"Config received: {config}")
         self.set_parameters(parameters)
         train(self.net, self.trainloader, epochs=self.local_epochs,
               device=self.device, train_settings=config)
+        log.info("Fit ends")
         return self.get_parameters(config={}), len(self.trainloader.dataset), {}
 
     def evaluate(self, parameters, config):
@@ -82,7 +47,7 @@ class FlowerClient(fl.client.NumPyClient):
         return loss, len(self.testloader.dataset), {"accuracy": accuracy}
 
 
-@hydra.main(config_path="conf", config_name="base", version_base=None)
+@hydra.main(config_path="conf", config_name="base_client", version_base=None)
 def main(cfg: DictConfig) -> None:
 
     # Print config structured as YAML
@@ -94,12 +59,12 @@ def main(cfg: DictConfig) -> None:
     # Let's delay the start of the client for a few seconds
     # to ensure the server is up and ready to accept connections
     # from clients
-    sleep(cfg.client.wait_for_server)
+    sleep(cfg.wait_for_server)
 
 
     # Instantiate client object, note that here I only need to pass the arguemtns
     # that were not specified in the config. Those that were, can still be overriden.
-    client = instantiate(cfg.client.client,
+    client = instantiate(cfg.client,
                          trainloader=trainloader,
                          testloader=testloader)
 

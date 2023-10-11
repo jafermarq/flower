@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision. models import resnet18
+from tqdm import tqdm
 
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
@@ -37,3 +38,28 @@ class ResNet(nn.Module):
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
+
+
+def train(net, trainloader, epochs, device, train_settings):
+    """Train the model on the training set."""
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(net.parameters(), lr=train_settings["lr"], momentum=train_settings["momentum"])
+    for _ in range(epochs):
+        for images, labels in tqdm(trainloader):
+            optimizer.zero_grad()
+            criterion(net(images.to(device)), labels.to(device)).backward()
+            optimizer.step()
+
+
+def test(net, testloader, device):
+    """Validate the model on the test set."""
+    criterion = torch.nn.CrossEntropyLoss()
+    correct, loss = 0, 0.0
+    with torch.no_grad():
+        for images, labels in tqdm(testloader):
+            outputs = net(images.to(device))
+            labels = labels.to(device)
+            loss += criterion(outputs, labels).item()
+            correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+    accuracy = correct / len(testloader.dataset)
+    return loss, accuracy

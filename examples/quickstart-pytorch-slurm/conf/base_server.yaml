@@ -1,0 +1,19 @@
+---
+
+defaults:
+  - model: basic # by default `model` will point to the content in `conf/model/basic.yaml`
+  # if you'd like to it to point to the resnet.yaml file instead, run the code as: python server.py model=resnet
+
+address: ??? # this indicates you must supply this when running the code.
+port: 6379
+num_rounds: 3
+device: cpu # or cuda:0
+fit_config: # settings the server communicates to the clients to paremeterise their `fit()` method
+  lr: 0.001
+  momentum: 0.9
+strategy:
+  _target_: flwr.server.strategy.FedAvg
+  
+hydra:
+  run:
+    dir: ./outputs/server/${now:%Y-%m-%d}/${now:%H-%M-%S}

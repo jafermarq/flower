@@ -1,11 +1,16 @@
 from typing import List, Tuple
+from collections import OrderedDict
 
 import flwr as fl
 from flwr.common import Metrics
 
+import torch
 import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
+
+from models import test
+from dataset import load_data
 
 # Define metric aggregation function
 def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
@@ -30,20 +35,45 @@ def get_on_fit_config(server_config: DictConfig):
 
     return fit_config_fn
 
-@hydra.main(config_path="conf", config_name="base", version_base=None)
+
+def get_evaluate_fn(testloader, device, model: DictConfig):
+    """Return a function that will be executed by the strategy
+    after aggregating models sent by the clients"""
+    def evaluate(
+        server_round: int, parameters_ndarrays, config):
+        """Use the entire MNIST test set for evaluation."""
+        net = instantiate(model)
+        params_dict = zip(net.state_dict().keys(), parameters_ndarrays)
+        state_dict = OrderedDict({k: torch.Tensor(v) for k, v in params_dict})
+        net.load_state_dict(state_dict, strict=True)
+        net.to(device)
+
+        loss, accuracy = test(net, testloader, device=device)
+
+        # return statistics
+        return loss, {"accuracy": accuracy}
+
+    return evaluate
+
+
+@hydra.main(config_path="conf", config_name="base_server", version_base=None)
 def main(cfg: DictConfig) -> None:
 
-    server_config = cfg.server
+    # Prepare testset for centralised evaluation
+    _, testloader = load_data()
 
     # Instantiate the strategy
-    strategy = instantiate(server_config.strategy,
+    strategy = instantiate(cfg.strategy,
                            evaluate_metrics_aggregation_fn=weighted_average,
-                           on_fit_config_fn=get_on_fit_config(server_config))
+                           on_fit_config_fn=get_on_fit_config(cfg),
+                           evaluate_fn=get_evaluate_fn(testloader,
+                                                       cfg.device,
+                                                       cfg.model))
 
     # Start Flower server
     fl.server.start_server(
-        server_address=f"{server_config.address}:{server_config.port}",
-        config=fl.server.ServerConfig(num_rounds=server_config.num_rounds),
+        server_address=f"{cfg.address}:{cfg.port}",
+        config=fl.server.ServerConfig(num_rounds=cfg.num_rounds),
         strategy=strategy,
     )
 

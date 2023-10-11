@@ -1,6 +1,6 @@
 # Flower Example using PyTorch (SLURM)
 
-> This example borrows most of its content from the [`quickstart-pytorch`](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch) example. The main difference here is in regards with the python environment setup (using conda) and the deployment infrastructure (SLURM). This that the Flower FL pipeline is the same as in the aforementioned example.
+> This example borrows most of its content from the [`quickstart-pytorch`](https://github.com/adap/flower/tree/main/examples/quickstart-pytorch) example. The main difference here is in regards with the python environment setup (using conda) and the deployment infrastructure (SLURM). This Flower FL pipeline is the same as in the aforementioned example.
 
 This introductory example to Flower uses PyTorch, but deep knowledge of PyTorch is not necessarily required to run the example. However, it will help you understand how to adapt Flower to your use case.
 Running this example in itself is quite easy.
@@ -8,6 +8,7 @@ Running this example in itself is quite easy.
 ## Project Setup
 
 Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
+
 
 ```shell
 git clone --depth=1 https://github.com/jafemarq/flower.git && mv flower/examples/quickstart-pytorch-slurm . && rm -rf flower && cd quickstart-pytorch-slurm
@@ -20,8 +21,12 @@ This will create a new directory called `quickstart-pytorch-slurm` containing th
 -- requirements.txt
 -- client.py
 -- server.py
+-- models.py
+-- dataset.py
 -- README.md
 ```
+
+In addition, the `conf/` directory contains [Hydra](https://hydra.cc/) `YAML` files that can be used to paremterise both the server and the clients.
 
 ### Installing Dependencies
 
@@ -38,10 +43,26 @@ source activate flower-slurm
 pip install -r requirements.txt
 ```
 
+## Running this example on your local machine
+
+You can run the code in this example directly on your machine (i.e. without using SLURM). In order to do so you should first launch the server, then the clients.
+
+```bash
+
+# launch the server with default settings and using localhost as address
+python server.py address='localhost' # change address accordingtly
+
+# Open a new terminal and launch a client
+python client.py server.address='localhost'
+
+# Then open a new terminal and launch another (launch more if you'd like to)
+python client.py server.address='localhost'
+```
+
 
 ## Run Federated Learning with PyTorch and Flower (in SLURM)
 
-If you have run other examples of Flower without using the [VirtualClientEngine](), you already know the drill, you need to manually launch the `server` and then connect to it as many `clients` as you wish. This can be done easily by ssh-ing into each device if you have access to it, or if you want to test things on your development machine you could simply open different terminal shells (maybe via [tmux]()). In order to do the same under SLURM, we need a bit more work.
+If you have run other examples of Flower without using the [VirtualClientEngine](https://flower.dev/docs/framework/how-to-run-simulations.html), you already know the drill, you need to manually launch the `server` and then connect to it as many `clients` as you wish. This can be done easily by ssh-ing into each device if you have access to it, or if you want to test things on your development machine you could simply open different terminal shells (maybe via [tmux](https://github.com/tmux/tmux/wiki#welcome-to-tmux)). In order to do the same under SLURM, we need a bit more work.
 
 The best is to define a standard SLURM script that we can executed via `sbatch` command. The basic idea is as follows: We want to submit to the SLURM scheduler N nodes (1 for the server, and N-1 for clients). But how to do this from a single script? See below the content of `slurm.sh`:
 
@@ -72,12 +93,12 @@ for ((i = 1; i <= worker_num; i++)); do
   node_i=${nodes_array[$i]}
   echo "Starting Client $i at $node_i"
   # launch clients but delay call to python client (so there is time for the server to start up)
-  srun --nodes=1 --ntasks=1 -w "$node_i" python client.py --server_address $ip --wait_for_server 15 &
+  srun --nodes=1 --ntasks=1 -w "$node_i" python client.py server.address=$ip wait_for_server=15 &
 done
 
 # Launch server
 echo "Starting server at $ip"
-python server.py --server_address $ip
+python server.py address=$ip
 
 ```
 
