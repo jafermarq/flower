@@ -24,9 +24,9 @@ for ((i = 1; i <= worker_num; i++)); do
   node_i=${nodes_array[$i]}
   echo "Starting Client $i at $node_i"
   # launch clients but delay call to python client (so there is time for the server to start up)
-  srun --nodes=1 --ntasks=1 -w "$node_i" python client.py --server_address $ip --wait_for_server 15 &
+  srun --nodes=1 --ntasks=1 -w "$node_i" python client.py server.address=$ip wait_for_server=15 &
 done
 
 # Launch server
 echo "Starting server at $ip"
-python server.py --server_address $ip
+python server.py address=$ip
