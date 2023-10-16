@@ -8,7 +8,7 @@ def load_data():
     trf = Compose([ToTensor(), Normalize((0.1307,), (0.3081,))])
     trainset = MNIST("./data", train=True, download=True, transform=trf)
     testset = MNIST("./data", train=False, download=True, transform=trf)
-    trainloader = DataLoader(trainset, batch_size=32, shuffle=True, num_workers=4)
-    testloader = DataLoader(testset, batch_size=32, num_workers=4)
+    trainloader = DataLoader(trainset, batch_size=32, shuffle=True, num_workers=1)
+    testloader = DataLoader(testset, batch_size=32, num_workers=1)
 
     return trainloader, testloader

@@ -1,6 +1,7 @@
 ---
 
 defaults:
+  - _self_
   - model: basic # by default `model` will point to the content in `conf/model/basic.yaml`
   # if you'd like to it to point to the resnet.yaml file instead, run the code as: python server.py model=resnet
 

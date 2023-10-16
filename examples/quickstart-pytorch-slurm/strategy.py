@@ -1,6 +1,6 @@
 import logging
 from collections import OrderedDict
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Tuple, Union
 
 import torch
 from hydra.utils import instantiate
@@ -99,9 +99,7 @@ class CustomFedAvg(FedAvg):
         # Now discard based on client's enrollment status
         return filter_by_client_enrollement(eval_config, "eval")
 
-    def evaluate(
-        self, server_round: int, parameters: Parameters
-    ) -> Tuple[float, Dict[str, Scalar]] | None:
+    def evaluate(self, server_round: int, parameters: Parameters):
         # Call evaluate as it would normally be called. We will return
         # it's output so to not interrupt the normal flow
         evaluate_output = super().evaluate(server_round, parameters)
