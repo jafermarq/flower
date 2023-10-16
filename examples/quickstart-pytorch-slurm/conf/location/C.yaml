@@ -1,0 +1,8 @@
+---
+name: LOCATION-C
+info:
+    rooms: 891011
+    floors: 5
+enrollment:
+    for_fit: true
+    for_eval: false

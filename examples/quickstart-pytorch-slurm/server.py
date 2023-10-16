@@ -6,11 +6,12 @@ from flwr.common import Metrics
 
 import torch
 import hydra
-from hydra.utils import instantiate
+from hydra.utils import instantiate, HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
 from models import test
 from dataset import load_data
+
 
 # Define metric aggregation function
 def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
@@ -21,15 +22,14 @@ def weighted_average(metrics: List[Tuple[int, Metrics]]) -> Metrics:
     # Aggregate and return custom metric (weighted average)
     return {"accuracy": sum(accuracies) / sum(examples)}
 
+
 def get_on_fit_config(server_config: DictConfig):
     # The function below will be called by the strategy before commencing
     # a new fit round. The dictionary it returns is the `config` the
     # client's 'fit()' method receives
     def fit_config_fn(server_round: int):
         # convert config to standard Python dict.
-        fit_config = OmegaConf.to_container(
-            server_config.fit_config, resolve=True
-        )
+        fit_config = OmegaConf.to_container(server_config.fit_config, resolve=True)
         fit_config["curr_round"] = server_round  # add round info
         return fit_config
 
@@ -37,10 +37,10 @@ def get_on_fit_config(server_config: DictConfig):
 
 
 def get_evaluate_fn(testloader, device, model: DictConfig):
-    """Return a function that will be executed by the strategy
-    after aggregating models sent by the clients"""
-    def evaluate(
-        server_round: int, parameters_ndarrays, config):
+    """Return a function that will be executed by the strategy after aggregating models
+    sent by the clients."""
+
+    def evaluate(server_round: int, parameters_ndarrays, config):
         """Use the entire MNIST test set for evaluation."""
         net = instantiate(model)
         params_dict = zip(net.state_dict().keys(), parameters_ndarrays)
@@ -58,17 +58,22 @@ def get_evaluate_fn(testloader, device, model: DictConfig):
 
 @hydra.main(config_path="conf", config_name="base_server", version_base=None)
 def main(cfg: DictConfig) -> None:
-
     # Prepare testset for centralised evaluation
     _, testloader = load_data()
 
+    # By default hydra creates an output directory each time you
+    # run this script. Let's retrieve it and use it to save
+    # checkpoints of the global model
+    save_path = HydraConfig.get().runtime.output_dir
+
     # Instantiate the strategy
-    strategy = instantiate(cfg.strategy,
-                           evaluate_metrics_aggregation_fn=weighted_average,
-                           on_fit_config_fn=get_on_fit_config(cfg),
-                           evaluate_fn=get_evaluate_fn(testloader,
-                                                       cfg.device,
-                                                       cfg.model))
+    strategy = instantiate(
+        cfg.strategy,
+        evaluate_metrics_aggregation_fn=weighted_average,
+        on_fit_config_fn=get_on_fit_config(cfg),
+        evaluate_fn=get_evaluate_fn(testloader, cfg.device, cfg.model),
+        exp_dir=save_path,
+    )
 
     # Start Flower server
     fl.server.start_server(
@@ -76,6 +81,7 @@ def main(cfg: DictConfig) -> None:
         config=fl.server.ServerConfig(num_rounds=cfg.num_rounds),
         strategy=strategy,
     )
+
 
 if __name__ == "__main__":
     main()

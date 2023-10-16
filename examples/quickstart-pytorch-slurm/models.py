@@ -1,9 +1,9 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision. models import resnet18
+from torchvision.models import resnet18
 from tqdm import tqdm
+
 
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
@@ -33,9 +33,11 @@ class ResNet(nn.Module):
         self.model = resnet18(num_classes=num_classes)
 
         # make adjustements so the model is more suitable for 32x32 or 28x28 inputs
-        self.model.conv1 = nn.Conv2d(in_channels, self.model.conv1.out_channels, kernel_size=3, stride=1)
+        self.model.conv1 = nn.Conv2d(
+            in_channels, self.model.conv1.out_channels, kernel_size=3, stride=1
+        )
         self.model.maxpool = nn.Identity()
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.model(x)
 
@@ -43,7 +45,9 @@ class ResNet(nn.Module):
 def train(net, trainloader, epochs, device, train_settings):
     """Train the model on the training set."""
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=train_settings["lr"], momentum=train_settings["momentum"])
+    optimizer = torch.optim.SGD(
+        net.parameters(), lr=train_settings["lr"], momentum=train_settings["momentum"]
+    )
     for _ in range(epochs):
         for images, labels in tqdm(trainloader):
             optimizer.zero_grad()
