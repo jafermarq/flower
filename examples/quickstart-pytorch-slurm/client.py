@@ -28,6 +28,7 @@ class FlowerClient(fl.client.NumPyClient):
         self.device = device
         self.location_info = location
         log.info("Client creation completled.")
+        log.info(self.location_info)
 
     def get_properties(self, config: Config) -> Dict[str, Scalar]:
         """Info that can be fetched by the server.
@@ -72,8 +73,12 @@ class FlowerClient(fl.client.NumPyClient):
         )
 
     def evaluate(self, parameters, config):
+        log.info("Evaluate beings")
+        t_start = time()
         self.set_parameters(parameters)
         loss, accuracy = test(self.net, self.testloader, device=self.device)
+        t_end = time() - t_start
+        log.info(f"Evaluate ends (too: {t_end:.2f} s)")
         return loss, len(self.testloader.dataset), {"accuracy": accuracy}
 
 
