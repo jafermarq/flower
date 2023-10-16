@@ -12,7 +12,7 @@ fit_config: # settings the server communicates to the clients to paremeterise th
   lr: 0.001
   momentum: 0.9
 strategy:
-  _target_: flwr.server.strategy.FedAvg
+  _target_: strategy.CustomFedAvg
   
 hydra:
   run:

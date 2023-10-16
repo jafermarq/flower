@@ -9,7 +9,6 @@ Running this example in itself is quite easy.
 
 Start by cloning the example project. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
 
-
 ```shell
 git clone --depth=1 https://github.com/jafemarq/flower.git && mv flower/examples/quickstart-pytorch-slurm . && rm -rf flower && cd quickstart-pytorch-slurm
 ```
@@ -45,7 +44,9 @@ pip install -r requirements.txt
 
 ## Running this example on your local machine
 
-You can run the code in this example directly on your machine (i.e. without using SLURM). In order to do so you should first launch the server, then the clients.
+You can run the code in this example directly on your machine (i.e. without using SLURM). In order to do so you should first launch the server, then the clients. Each clients needs to specify the server's address and the client's location (i.e. info in .yaml to further customise each client). The additional information in `location` configures the form of _enrolment_ the client follows: participate in  `fit()` and `evaluate()`, or only on one of those.
+
+The server uses a custom version of `FedAvg` that adds support for this dynamic enrolment by clients.
 
 ```bash
 
@@ -53,10 +54,10 @@ You can run the code in this example directly on your machine (i.e. without usin
 python server.py address='localhost' # change address accordingtly
 
 # Open a new terminal and launch a client
-python client.py server.address='localhost'
+python client.py server.address='localhost' location=A
 
-# Then open a new terminal and launch another (launch more if you'd like to)
-python client.py server.address='localhost'
+# Then open a new terminal and launch another (using another setting -- currently there are location=A,B,C)
+python client.py server.address='localhost' location=B
 ```
 
 Each time you run these commands, Hydra will generate a new output directory where the config used and the logs are dumped. By default, all this will go to a directory named `outputs/<server-or-client>/<date>/<time>`. For example, executing the above lines of code would generate a directory structure for `outputs` as follows:
@@ -67,10 +68,11 @@ outputs
    ├── server
    |      └── date/time/<logs and config>  
    └── client
-          ├── date/time/<logs and config>
-          └── date/time/<logs and config>
+          ├── LOCATION-A
+          |       └──   date/time/<logs and config>
+          └── LOCATION-B 
+                  └──   date/time/<logs and config>
 ```
-
 
 ## Run Federated Learning with PyTorch and Flower (in SLURM)
 
@@ -99,13 +101,16 @@ ip=$(hostname --ip-address)
 nodes=$(scontrol show hostnames "$SLURM_JOB_NODELIST") # Getting the node names
 nodes_array=($nodes)
 
+# specifies additional info for each client
+locations=("A" "B")
+
 worker_num=$((SLURM_JOB_NUM_NODES - 1)) # number of nodes other than the server node
 # Spawn a client in each node
 for ((i = 1; i <= worker_num; i++)); do
-  node_i=${nodes_array[$i]}
-  echo "Starting Client $i at $node_i"
-  # launch clients but delay call to python client (so there is time for the server to start up)
-  srun --nodes=1 --ntasks=1 -w "$node_i" python client.py server.address=$ip wait_for_server=15 &
+    node_i=${nodes_array[$i]}
+    echo "Starting Client $i at $node_i"
+    # launch clients but delay call to python client (so there is time for the server to start up)
+    srun --nodes=1 --ntasks=1 -w "$node_i" python client.py server.address=$ip wait_for_server=15 location=${locations[$i]} &
 done
 
 # Launch server
@@ -115,7 +120,6 @@ python server.py address=$ip
 ```
 
 Ensure you have updated the required header fields in the `slurm.sh`. Then executed it as follows after you have created your conda environment:
-
 
 ```bash
 sbatch slurm.sh

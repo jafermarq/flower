@@ -1,7 +1,7 @@
-
 from torch.utils.data import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import Compose, Normalize, ToTensor
+
 
 def load_data():
     """Load CIFAR-10 (training and test set)."""

@@ -1,0 +1,8 @@
+---
+name: LOCATION-B
+info:
+    rooms: 567
+    floors: 2
+enrollment:
+    for_fit: false
+    for_eval: true

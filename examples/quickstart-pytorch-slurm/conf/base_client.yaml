@@ -3,6 +3,7 @@
 defaults:
   - model: basic # by default `model` will point to the content in `conf/model/basic.yaml`
   # if you'd like to it to point to the resnet.yaml file instead, run the code as: python client.py model=resnet
+  - location: ???
 
 wait_for_server: 0 # wait for this many seconds before starting the client
 client:
@@ -11,6 +12,7 @@ client:
   local_epochs: 1
   net_config: ${model} # a refenence to the model node in the config
   device: cpu # or cuda:0
+  location: ${location}
 
 server:
   address: ??? # this indicates you must supply this when running the code.
@@ -18,4 +20,4 @@ server:
 
 hydra:
   run:
-    dir: ./outputs/client/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: ./outputs/client/${location.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
