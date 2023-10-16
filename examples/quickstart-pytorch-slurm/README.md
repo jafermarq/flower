@@ -69,9 +69,19 @@ outputs
    |      └── date/time/<logs and config>  
    └── client
           ├── LOCATION-A
-          |       └──   date/time/<logs and config>
-          └── LOCATION-B 
+          .       └──   date/time/<logs and config>
+          .
+          .
+          └── LOCATION-Z 
                   └──   date/time/<logs and config>
+```
+
+### Saving and loading the global model
+
+This example makes use of a [`CustomFedAvg`](strategy.py) class that, a part from controlling the enrolment of clients for different tasks, it also has built-in support to initialise the global model froma checkpoint (`state_dict`). It also writes to disk a copy of the global model after each round. Launch the server as follows to initialise from a checkpoint:
+
+```bash
+python server.py address='localhost' checkpoint=<path_to_checkpoint_state_dict> # change address accordingtly
 ```
 
 ## Run Federated Learning with PyTorch and Flower (in SLURM)

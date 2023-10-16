@@ -6,7 +6,7 @@ from flwr.common import Metrics
 
 import torch
 import hydra
-from hydra.utils import instantiate
+from hydra.utils import instantiate, HydraConfig
 from omegaconf import DictConfig, OmegaConf
 
 from models import test
@@ -61,12 +61,18 @@ def main(cfg: DictConfig) -> None:
     # Prepare testset for centralised evaluation
     _, testloader = load_data()
 
+    # By default hydra creates an output directory each time you
+    # run this script. Let's retrieve it and use it to save
+    # checkpoints of the global model
+    save_path = HydraConfig.get().runtime.output_dir
+
     # Instantiate the strategy
     strategy = instantiate(
         cfg.strategy,
         evaluate_metrics_aggregation_fn=weighted_average,
         on_fit_config_fn=get_on_fit_config(cfg),
         evaluate_fn=get_evaluate_fn(testloader, cfg.device, cfg.model),
+        exp_dir=save_path,
     )
 
     # Start Flower server
