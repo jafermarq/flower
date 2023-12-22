@@ -1,0 +1,8 @@
+---
+name: LOCATION-A
+info: # info that might be used upon client construction (not used in the example)
+    rooms: 1234
+    floors: 8
+enrollment:
+    for_fit: true # if true, will participate in `fit` round.
+    for_eval: true # if true, will participate in `evaluate` round.

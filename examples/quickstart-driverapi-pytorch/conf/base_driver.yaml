@@ -1,0 +1,27 @@
+---
+
+defaults:
+  - _self_
+  - model: basic # by default `model` will point to the content in `conf/model/basic.yaml`
+  # if you'd like to it to point to the resnet.yaml file instead, run the code as: python server.py model=resnet
+
+address: ??? # this indicates you must supply this when running the code.
+num_rounds: 3
+device: cpu # or cuda:0
+fit_config: # settings the server communicates to the clients to paremeterise their `fit()` method
+  lr: 0.001
+  momentum: 0.9
+
+checkpoint: null # path to a checkpoint to use for global model initialisation
+
+strategy:
+  _target_: strategy.CustomFedAvg
+  _recursive_: false
+  fraction_fit: 1.0 # all^{*} clients will be sampled for `fit()` (some will be dropped based on enrolmnet)
+  fraction_evaluate: 1.0 # all^{*} clients will be sampled for `evaluate()` (some will be dropped based on enrolmnet)
+  path_to_checkpoint: ${checkpoint}
+  cfg_model: ${model}
+  
+hydra:
+  run:
+    dir: ./outputs/driver/${now:%Y-%m-%d}/${now:%H-%M-%S}
