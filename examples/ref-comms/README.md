@@ -38,7 +38,7 @@ python test_push_pull_minio.py # same test but with a 1B LLLM
 
 ### Now with Flower
 
-Run a 3-round federation with a 1B LLM model (or a smaller ResNet18 if you pass `--resnet` when executing the commands below).
+Run a 3-round federation with a 1B LLM model (or a smaller ResNet18 if you pass `--resnet` when executing the commands below). In this example, clients don't do any training and the aggregation is also vastly simplified.
 
 ```bash
 python server.py
