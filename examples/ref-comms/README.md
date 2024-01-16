@@ -48,3 +48,7 @@ Now start at least two clients:
 ```bash
 python client.py
 ```
+
+### Limitations
+
+Models are not deleted from the DB, so if you run it for long or with very large models you'll run out of space. If you want to erase the contents of the DB the best is to: (1) terminalte the MinIO container, (2) erase the contents of `./minio/data` (or the path you mounted on when executing the `docker run`)
