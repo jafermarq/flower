@@ -6,7 +6,7 @@ TL;DR; Don't communicate models over `gRPC`, instead communicate a reference to 
 
 > This example has hardoced credentials, so run this for testing purposes only
 
-### Build your python environment
+### Build your Python environment
 
 ```bash
 conda install -n minio-tests python=3.10 -y
@@ -19,8 +19,10 @@ You'll need to have Docker installed.
 
 ### Launch MinIO DB
 
-Launch a container with a very vanillay MinIO setup. Here we'll just use the command provided in the [MinIO](https://min.io/docs/minio/container/index.html) docker docs.
+Launch a container with a very vanilla MinIO setup. Here we'll just use the command provided in the [MinIO](https://min.io/docs/minio/container/index.html) docker docs.
 ```bash
+mkdir -p minio/data # this is only needed the first time you run the example
+
 ./run_minio.sh
 ```
 
@@ -31,7 +33,7 @@ The `test_push_pull_minio.py` shows in a single function how to push/pull to/fro
 ```bash
 python test_push_pull_minio.py --toy # will communicate the state_dict of a small nn.Conv2d layer
 
-python test_push_pull_minio.py # pushes a 1B LLLM
+python test_push_pull_minio.py # same test but with a 1B LLLM
 ```
 
 ### Now with Flower
