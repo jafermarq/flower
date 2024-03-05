@@ -1,4 +1,5 @@
 """Flower client example using PyTorch for CIFAR-10 image classification."""
+
 import argparse
 from collections import OrderedDict
 from typing import Dict, List, Tuple
@@ -24,10 +25,10 @@ class CifarClient(fl.client.NumPyClient):
     """Flower client implementing CIFAR-10 image classification using PyTorch."""
 
     def __init__(
-            self,
-            model: cifar.Net,
-            trainloader: DataLoader,
-            testloader: DataLoader,
+        self,
+        model: cifar.Net,
+        trainloader: DataLoader,
+        testloader: DataLoader,
     ) -> None:
         self.model = model
         self.trainloader = trainloader
@@ -61,7 +62,7 @@ class CifarClient(fl.client.NumPyClient):
             self.model.load_state_dict(state_dict, strict=True)
 
     def fit(
-            self, parameters: List[np.ndarray], config: Dict[str, str]
+        self, parameters: List[np.ndarray], config: Dict[str, str]
     ) -> Tuple[List[np.ndarray], int, Dict]:
         # Set model parameters, train model, return updated model parameters
         self.set_parameters(parameters)
@@ -69,7 +70,7 @@ class CifarClient(fl.client.NumPyClient):
         return self.get_parameters(config={}), len(self.trainloader.dataset), {}
 
     def evaluate(
-            self, parameters: List[np.ndarray], config: Dict[str, str]
+        self, parameters: List[np.ndarray], config: Dict[str, str]
     ) -> Tuple[float, int, Dict]:
         # Set model parameters, evaluate model on local test dataset, return result
         self.set_parameters(parameters)
@@ -80,11 +81,11 @@ class CifarClient(fl.client.NumPyClient):
 def main() -> None:
     """Load data, start CifarClient."""
     parser = argparse.ArgumentParser(description="Flower")
-    parser.add_argument("--node-id", type=int, required=True, choices=range(0, 10))
+    parser.add_argument("--partition-id", type=int, required=True, choices=range(0, 10))
     args = parser.parse_args()
 
     # Load data
-    trainloader, testloader = cifar.load_data(args.node_id)
+    trainloader, testloader = cifar.load_data(args.partition_id)
 
     # Load model
     model = cifar.Net().to(DEVICE).train()
@@ -93,8 +94,8 @@ def main() -> None:
     _ = model(next(iter(trainloader))["img"].to(DEVICE))
 
     # Start client
-    client = CifarClient(model, trainloader, testloader)
-    fl.client.start_numpy_client(server_address="127.0.0.1:8080", client=client)
+    client = CifarClient(model, trainloader, testloader).to_client()
+    fl.client.start_client(server_address="127.0.0.1:8080", client=client)
 
 
 if __name__ == "__main__":

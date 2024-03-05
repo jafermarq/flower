@@ -51,10 +51,10 @@ class Net(nn.Module):
         return x
 
 
-def load_data(node_id: int):
+def load_data(partition_id: int):
     """Load partition CIFAR10 data."""
     fds = FederatedDataset(dataset="cifar10", partitioners={"train": 10})
-    partition = fds.load_partition(node_id)
+    partition = fds.load_partition(partition_id)
     # Divide data on each node: 80% train, 20% test
     partition_train_test = partition.train_test_split(test_size=0.2)
     pytorch_transforms = Compose(
@@ -73,10 +73,10 @@ def load_data(node_id: int):
 
 
 def train(
-        net: Net,
-        trainloader: torch.utils.data.DataLoader,
-        epochs: int,
-        device: torch.device,  # pylint: disable=no-member
+    net: Net,
+    trainloader: torch.utils.data.DataLoader,
+    epochs: int,
+    device: torch.device,  # pylint: disable=no-member
 ) -> None:
     """Train the network."""
     # Define loss and optimizer
@@ -110,9 +110,9 @@ def train(
 
 
 def test(
-        net: Net,
-        testloader: torch.utils.data.DataLoader,
-        device: torch.device,  # pylint: disable=no-member
+    net: Net,
+    testloader: torch.utils.data.DataLoader,
+    device: torch.device,  # pylint: disable=no-member
 ) -> Tuple[float, float]:
     """Validate the network on the entire test set."""
     # Define loss and metrics
