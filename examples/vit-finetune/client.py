@@ -1,10 +1,11 @@
 import torch
 from torch.utils.data import DataLoader
 
+import flwr
 from flwr.client import NumPyClient
 
 
-from dataset import apply_transforms
+from dataset import apply_transforms, get_dataset_with_partitions
 from model import get_model, set_parameters, train
 
 
@@ -62,15 +63,20 @@ class FedViTClient(NumPyClient):
             {"train_loss": avg_train_loss},
         )
 
+# Downloads and partition dataset
+federated_c100, _ = get_dataset_with_partitions(num_partitions=20)
 
-def get_client_fn(federated_dataset):
-    def get_client(cid: str):
-        """Return a FedViTClient that trains with the cid-th data partition."""
+def client_fn(cid: str):
+    """Return a FedViTClient that trains with the cid-th data partition."""
 
-        trainset_for_this_client = federated_dataset.load_partition(int(cid), "train")
+    trainset_for_this_client = federated_c100.load_partition(int(cid), "train")
 
-        trainset = trainset_for_this_client.with_transform(apply_transforms)
+    trainset = trainset_for_this_client.with_transform(apply_transforms)
 
-        return FedViTClient(trainset).to_client()
+    return FedViTClient(trainset).to_client()
 
-    return get_client
+
+# To be used with Flower Next
+app = flwr.client.ClientApp(
+    client_fn=client_fn,
+)

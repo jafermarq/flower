@@ -3,20 +3,13 @@ import argparse
 import flwr as fl
 import matplotlib.pyplot as plt
 
-from server import get_strategy
-from client import get_client_fn
-from dataset import get_dataset_with_partitions
+from server import strategy
+from client import client_fn
 
 parser = argparse.ArgumentParser(
     description="Finetuning of a ViT with Flower Simulation."
 )
 
-parser.add_argument(
-    "--num-clients",
-    type=int,
-    default=20,
-    help="Number total clients in the experiment.",
-)
 parser.add_argument(
     "--num-rounds",
     type=int,
@@ -29,15 +22,6 @@ def main():
 
     args = parser.parse_args()
 
-    # Download and partition dataset
-    federated_c100, centralised_testset = get_dataset_with_partitions(args.num_clients)
-
-    # Construct `get_client` function
-    client_fn = get_client_fn(federated_c100)
-
-    # Construct strategy
-    strategy = get_strategy(centralised_testset)
-
     # To control the degree of parallelism
     # With default settings in this example,
     # each client should take just ~2GB of VRAM.
@@ -49,7 +33,7 @@ def main():
     # Launch simulation
     history = fl.simulation.start_simulation(
         client_fn=client_fn,
-        num_clients=args.num_clients,
+        num_clients=20,
         client_resources=client_resources,
         config=fl.server.ServerConfig(num_rounds=args.num_rounds),
         strategy=strategy,

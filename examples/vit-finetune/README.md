@@ -21,13 +21,18 @@ conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvi
 pip install -r requirements.txt
 ```
 
-### Run the simulation
+### Run with `start_simulation()`
 
-Running the example is quite straightforward. You can control the number of total clients with `--num-clients` (defaults to 20) and the number of rounds `--num-rounds` (which defaults to 10).
+Running the example is quite straightforward. You can control the number of rounds `--num-rounds` (which defaults to 10).
 
 ```bash
 python main.py
 ```
+
+![](_static/central_evaluation.png)
+
+
+Take a look at the [Documentation](https://flower.ai/docs/framework/how-to-run-simulations.html) for more details on how you can customise your simulation.
 
 Running the example as-is on an RTX 3090Ti should take ~1min/round running 4 clients in parallel (plus the _global model_ during centralized evaluation stages) in a single GPU. Note that more clients could fit in VRAM, but since the GPU utilization is high (99%-100%) we are probably better off not doing that (at least in this case).
 
@@ -56,4 +61,12 @@ Running the example as-is on an RTX 3090Ti should take ~1min/round running 4 cli
 |    0   N/A  N/A     31421      C   ray::DefaultActor.run                      1536MiB |
 |    0   N/A  N/A     31422      C   ray::DefaultActor.run                      1536MiB |
 +---------------------------------------------------------------------------------------+
+```
+
+
+### Run with Flower Next (preview)
+
+```bash
+flower-simulation --client-app=client:app --server-app=server:app --num-supernodes=20 \
+    --backend-config='{"client_resources": {"num_cpus":4, "num_gpus":0.25}}'
 ```
