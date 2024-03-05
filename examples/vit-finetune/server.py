@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader
 import flwr as fl
 
 from dataset import apply_eval_transforms
-from model import get_vit_B_16x16_for_finetuning, set_parameters, test
+from model import get_model, set_parameters, test
 
 
 def fit_config(server_round: int):
@@ -27,7 +27,7 @@ def get_evaluate_fn(
         # Determine device
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-        model = get_vit_B_16x16_for_finetuning()
+        model = get_model()
         set_parameters(model, parameters)
         model.to(device)
 

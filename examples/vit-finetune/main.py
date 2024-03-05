@@ -1,12 +1,15 @@
 import argparse
 
 import flwr as fl
+import matplotlib.pyplot as plt
 
 from server import get_strategy
 from client import get_client_fn
 from dataset import get_dataset_with_partitions
 
-parser = argparse.ArgumentParser(description="Finetuning of a ViT with Flower Simulation.")
+parser = argparse.ArgumentParser(
+    description="Finetuning of a ViT with Flower Simulation."
+)
 
 parser.add_argument(
     "--num-clients",
@@ -20,6 +23,7 @@ parser.add_argument(
     default=10,
     help="Number of rounds.",
 )
+
 
 def main():
 
@@ -52,6 +56,17 @@ def main():
     )
 
     print(history)
+
+    # Basic plotting
+    global_accuracy_centralised = history.metrics_centralized["accuracy"]
+    round = [data[0] for data in global_accuracy_centralised]
+    acc = [100.0 * data[1] for data in global_accuracy_centralised]
+    plt.plot(round, acc)
+    plt.grid()
+    plt.ylabel("Accuracy (%)")
+    plt.xlabel("Round")
+    plt.title("Federated finetuning of ViT for CIFAR-100")
+    plt.savefig("central_evaluation.png")
 
 
 if __name__ == "__main__":

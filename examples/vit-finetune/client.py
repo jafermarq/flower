@@ -5,7 +5,7 @@ from flwr.client import NumPyClient
 
 
 from dataset import apply_transforms
-from model import get_vit_B_16x16_for_finetuning, set_parameters, train
+from model import get_model, set_parameters, train
 
 
 class FedViTClient(NumPyClient):
@@ -13,7 +13,7 @@ class FedViTClient(NumPyClient):
     def __init__(self, trainset):
 
         self.trainset = trainset
-        self.model = get_vit_B_16x16_for_finetuning()
+        self.model = get_model()
 
         # Determine device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
