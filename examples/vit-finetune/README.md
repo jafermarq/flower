@@ -1,23 +1,44 @@
 # Federated finetuning of a ViT
 
-This example shows how to use Flower's Simulation Engine to federate the finetuning of a [ViT-Base](https://pytorch.org/vision/main/models/generated/torchvision.models.vit_b_16.html#torchvision.models.vit_b_16) that has been pretrained on ImageNet. To keep things simple we'll be finetuning it to CIFAR-100, creating 20 partitions using [Flower-datasets](https://flower.ai/docs/datasets/). We'll be finetuning just the exit `head` of the ViT, this means that the training is not that costly and each client requires just ~1.5GB of VRAM (for a batchs ize of 64 images).
+This example shows how to use Flower's Simulation Engine to federate the finetuning of a Vision Transformer ([ViT-Base-16](https://pytorch.org/vision/main/models/generated/torchvision.models.vit_b_16.html#torchvision.models.vit_b_16)) that has been pretrained on ImageNet. To keep things simple we'll be finetuning it to CIFAR-100, creating 20 partitions using [Flower-datasets](https://flower.ai/docs/datasets/). We'll be finetuning just the exit `head` of the ViT, this means that the training is not that costly and each client requires just ~1.5GB of VRAM (for a batch size of 64 images).
 
-### Environment setup
+## Running the example
 
-Create a new Python environment. The steps below show how to do it with Conda.
+If you haven't cloned the Flower repository already you might want to clone code example and discard the rest. We prepared a single-line command that you can copy into your shell which will checkout the example for you:
 
-```bash
+```shell
+git clone --depth=1 https://github.com/adap/flower.git && mv flower/examples/vit-finetune . && rm -rf flower && cd vit-finetune
+```
 
-# Create env
-conda create -n flower-vit-finetune python=3.10 -y
+This will create a new directory called `simulation-pytorch` containing the following files:
 
-# Activate it
-conda activate flower-vit-finetune
+```
+-- README.md         <- Your're reading this right now
+-- main.py           <- Main file that launches the simulation
+-- client.py         <- Contains Flower client code and ClientApp
+-- server.py         <- Contains Flower server code and ServerApp
+-- model.py          <- Defines model and train/eval functions
+-- dataset.py        <- Downloads, partitions and processes dataset
+-- pyproject.toml    <- Example dependencies
+-- requirements.txt  <- Example dependencies
+```
 
-# Install PyTorch + TorchVision
-conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia -y
+### Installing Dependencies
 
-# Then, install Flower and FlowerDatasets
+Project dependencies (such as `torch` and `flwr`) are defined in `pyproject.toml` and `requirements.txt`. We recommend [Poetry](https://python-poetry.org/docs/) to install those dependencies and manage your virtual environment ([Poetry installation](https://python-poetry.org/docs/#installation)) or [pip](https://pip.pypa.io/en/latest/development/), but feel free to use a different way of installing dependencies and managing virtual environments if you have other preferences.
+
+#### Poetry
+
+```shell
+poetry install
+poetry shell
+```
+
+#### pip
+
+With an activated environemnt, install the dependencies for this example:
+
+```shell
 pip install -r requirements.txt
 ```
 
