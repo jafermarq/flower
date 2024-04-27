@@ -291,9 +291,11 @@ def run_fleet_api() -> None:
 
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 def run_superlink() -> None:
-    """Run Flower server (Driver API and Fleet API)."""
-    log(INFO, "Starting Flower server")
+    """Run Flower SuperLink (Driver API and Fleet API)."""
+    log(INFO, "Starting Flower SuperLink")
+
     event(EventType.RUN_SUPERLINK_ENTER)
+
     args = _parse_args_run_superlink().parse_args()
 
     # Parse IP address
@@ -365,7 +367,7 @@ def run_superlink() -> None:
             client_app_attr=args.client_app,
             backend_name=args.backend,
             backend_config_json_stream=args.backend_config,
-            working_dir=args.dir,
+            app_dir=args.app_dir,
             state_factory=state_factory,
             f_stop=f_stop,
         )
@@ -441,7 +443,7 @@ def _run_fleet_api_vce(
     client_app_attr: str,
     backend_name: str,
     backend_config_json_stream: str,
-    working_dir: str,
+    app_dir: str,
     state_factory: StateFactory,
     f_stop: asyncio.Event,
 ) -> None:
@@ -453,7 +455,7 @@ def _run_fleet_api_vce(
         backend_name=backend_name,
         backend_config_json_stream=backend_config_json_stream,
         state_factory=state_factory,
-        working_dir=working_dir,
+        app_dir=app_dir,
         f_stop=f_stop,
     )
 
@@ -568,9 +570,7 @@ def _parse_args_run_fleet_api() -> argparse.ArgumentParser:
 def _parse_args_run_superlink() -> argparse.ArgumentParser:
     """Parse command line arguments for both Driver API and Fleet API."""
     parser = argparse.ArgumentParser(
-        description="This will start a Flower server "
-        "(meaning, a Driver API and a Fleet API), "
-        "that clients will be able to connect to.",
+        description="Start a Flower SuperLink",
     )
 
     _add_args_common(parser=parser)
@@ -705,7 +705,7 @@ def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
         "`flwr.common.typing.ConfigsRecordValues`. ",
     )
     parser.add_argument(
-        "--dir",
+        "--app-dir",
         default="",
         help="Add specified directory to the PYTHONPATH and load"
         "ClientApp from there."
