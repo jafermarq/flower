@@ -1,4 +1,4 @@
-# Copyright 2020 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2024 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,33 +15,36 @@
 """Tests for ServerApp."""
 
 
-from unittest.mock import MagicMock
+from collections.abc import Iterator
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
-from flwr.common import Context, RecordSet
+from flwr.common import Context, RecordDict
 from flwr.server import ServerApp, ServerConfig
-from flwr.server.driver import Driver
+from flwr.server.grid import Grid
 
 
 def test_server_app_custom_mode() -> None:
     """Test sampling w/o criterion."""
     # Prepare
     app = ServerApp()
-    driver = MagicMock()
-    context = Context(state=RecordSet())
+    grid = MagicMock()
+    context = Context(
+        run_id=1, node_id=0, node_config={}, state=RecordDict(), run_config={}
+    )
 
     called = {"called": False}
 
     # pylint: disable=unused-argument
     @app.main()
-    def custom_main(driver: Driver, context: Context) -> None:
+    def custom_main(grid: Grid, context: Context) -> None:
         called["called"] = True
 
     # pylint: enable=unused-argument
 
     # Execute
-    app(driver, context)
+    app(grid, context)
 
     # Assert
     assert called["called"]
@@ -56,7 +59,110 @@ def test_server_app_exception_when_both_modes() -> None:
     with pytest.raises(ValueError):
         # pylint: disable=unused-argument
         @app.main()
-        def custom_main(driver: Driver, context: Context) -> None:
+        def custom_main(grid: Grid, context: Context) -> None:
             pass
 
         # pylint: enable=unused-argument
+
+
+def test_lifespan_success() -> None:
+    """Test the lifespan decorator with success."""
+    # Prepare
+    app = ServerApp()
+    enter_code = Mock()
+    exit_code = Mock()
+
+    @app.lifespan()
+    def test_fn(_: Context) -> Iterator[None]:
+        enter_code()
+        yield
+        exit_code()
+
+    # Execute
+    with app._lifespan(Mock(spec=Context)):  # pylint: disable=W0212
+        pass
+
+    # Assert
+    enter_code.assert_called_once()
+    exit_code.assert_called_once()
+
+
+def test_lifespan_failure() -> None:
+    """Test the lifespan decorator with failure."""
+    # Prepare
+    app = ServerApp()
+    enter_code = Mock()
+    exit_code = Mock()
+
+    @app.lifespan()
+    def test_fn(_: Context) -> Iterator[None]:
+        enter_code()
+        yield
+        exit_code()
+
+    # Execute
+    try:
+        with app._lifespan(Mock(spec=Context)):  # pylint: disable=W0212
+            raise RuntimeError("Test exception")
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("Expected RuntimeError")
+
+    # Assert
+    enter_code.assert_called_once()
+    exit_code.assert_called_once()
+
+
+def test_lifespan_no_yield() -> None:
+    """Test the lifespan decorator with no yield."""
+    # Prepare
+    app = ServerApp()
+    enter_code = Mock()
+
+    @app.lifespan()
+    def test_fn(_: Context) -> Iterator[None]:  # type: ignore
+        enter_code()
+
+    # Execute
+    try:
+        with app._lifespan(Mock(spec=Context)):  # pylint: disable=W0212
+            pass
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("Expected RuntimeError")
+
+    # Assert
+    enter_code.assert_called_once()
+
+
+def test_lifespan_multiple_yields() -> None:
+    """Test the lifespan decorator with multiple yields."""
+    # Prepare
+    app = ServerApp()
+    enter_code = Mock()
+    middle_code = Mock()
+    exit_code = Mock()
+
+    @app.lifespan()
+    def test_fn(_: Context) -> Iterator[None]:
+        enter_code()
+        yield
+        middle_code()
+        yield
+        exit_code()
+
+    # Execute
+    try:
+        with app._lifespan(Mock(spec=Context)):  # pylint: disable=W0212
+            pass
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("Expected RuntimeError")
+
+    # Assert
+    enter_code.assert_called_once()
+    middle_code.assert_called_once()
+    exit_code.assert_not_called()

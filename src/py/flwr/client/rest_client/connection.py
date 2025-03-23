@@ -1,4 +1,4 @@
-# Copyright 2020 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2023 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,66 +16,67 @@
 
 
 import random
-import sys
 import threading
+from collections.abc import Iterator
 from contextlib import contextmanager
 from copy import copy
 from logging import ERROR, INFO, WARN
-from typing import Callable, Iterator, Optional, Tuple, Type, TypeVar, Union
+from typing import Callable, Optional, TypeVar, Union
 
 from cryptography.hazmat.primitives.asymmetric import ec
 from google.protobuf.message import Message as GrpcMessage
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from flwr.client.heartbeat import start_ping_loop
 from flwr.client.message_handler.message_handler import validate_out_message
-from flwr.client.message_handler.task_handler import get_task_ins, validate_task_ins
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
 from flwr.common.constant import (
-    MISSING_EXTRA_REST,
     PING_BASE_MULTIPLIER,
     PING_CALL_TIMEOUT,
     PING_DEFAULT_INTERVAL,
     PING_RANDOM_RANGE,
 )
+from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.logger import log
 from flwr.common.message import Message, Metadata
 from flwr.common.retry_invoker import RetryInvoker
-from flwr.common.serde import message_from_taskins, message_to_taskres
+from flwr.common.serde import message_from_proto, message_to_proto, run_from_proto
+from flwr.common.typing import Fab, Run
+from flwr.proto.fab_pb2 import GetFabRequest, GetFabResponse  # pylint: disable=E0611
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     CreateNodeRequest,
     CreateNodeResponse,
     DeleteNodeRequest,
     DeleteNodeResponse,
-    GetRunRequest,
-    GetRunResponse,
     PingRequest,
     PingResponse,
-    PullTaskInsRequest,
-    PullTaskInsResponse,
-    PushTaskResRequest,
-    PushTaskResResponse,
+    PullMessagesRequest,
+    PullMessagesResponse,
+    PushMessagesRequest,
+    PushMessagesResponse,
 )
 from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.task_pb2 import TaskIns  # pylint: disable=E0611
+from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 
 try:
     import requests
 except ModuleNotFoundError:
-    sys.exit(MISSING_EXTRA_REST)
+    flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
 
 
 PATH_CREATE_NODE: str = "api/v0/fleet/create-node"
 PATH_DELETE_NODE: str = "api/v0/fleet/delete-node"
-PATH_PULL_TASK_INS: str = "api/v0/fleet/pull-task-ins"
-PATH_PUSH_TASK_RES: str = "api/v0/fleet/push-task-res"
+PATH_PULL_MESSAGES: str = "/api/v0/fleet/pull-messages"
+PATH_PUSH_MESSAGES: str = "/api/v0/fleet/push-messages"
 PATH_PING: str = "api/v0/fleet/ping"
 PATH_GET_RUN: str = "/api/v0/fleet/get-run"
+PATH_GET_FAB: str = "/api/v0/fleet/get-fab"
 
 T = TypeVar("T", bound=GrpcMessage)
 
 
 @contextmanager
-def http_request_response(  # pylint: disable=,R0913, R0914, R0915
+def http_request_response(  # pylint: disable=R0913,R0914,R0915,R0917
     server_address: str,
     insecure: bool,  # pylint: disable=unused-argument
     retry_invoker: RetryInvoker,
@@ -84,15 +85,16 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
         Union[bytes, str]
     ] = None,  # pylint: disable=unused-argument
     authentication_keys: Optional[  # pylint: disable=unused-argument
-        Tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey]
+        tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey]
     ] = None,
 ) -> Iterator[
-    Tuple[
+    tuple[
         Callable[[], Optional[Message]],
         Callable[[Message], None],
+        Optional[Callable[[], Optional[int]]],
         Optional[Callable[[], None]],
-        Optional[Callable[[], None]],
-        Optional[Callable[[int], Tuple[str, str]]],
+        Optional[Callable[[int], Run]],
+        Optional[Callable[[str, int], Fab]],
     ]
 ]:
     """Primitives for request/response-based interaction with a server.
@@ -118,10 +120,16 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
         Path of the root certificate. If provided, a secure
         connection using the certificates will be established to an SSL-enabled
         Flower server. Bytes won't work for the REST API.
+    authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
+        Client authentication is not supported for this transport type.
 
     Returns
     -------
-    receive, send : Callable, Callable
+    receive : Callable
+    send : Callable
+    create_node : Optional[Callable]
+    delete_node : Optional[Callable]
+    get_run : Optional[Callable]
     """
     log(
         WARN,
@@ -146,6 +154,8 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
             "For the REST API, the root certificates "
             "must be provided as a string path to the client.",
         )
+    if authentication_keys is not None:
+        log(ERROR, "Client authentication is not supported for this transport type.")
 
     # Shared variables for inner functions
     metadata: Optional[Metadata] = None
@@ -158,7 +168,7 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
     ###########################################################################
 
     def _request(
-        req: GrpcMessage, res_type: Type[T], api_path: str, retry: bool = True
+        req: GrpcMessage, res_type: type[T], api_path: str, retry: bool = True
     ) -> Optional[T]:
         # Serialize the request
         req_bytes = req.SerializeToString()
@@ -229,19 +239,20 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
         if not ping_stop_event.is_set():
             ping_stop_event.wait(next_interval)
 
-    def create_node() -> None:
+    def create_node() -> Optional[int]:
         """Set create_node."""
         req = CreateNodeRequest(ping_interval=PING_DEFAULT_INTERVAL)
 
         # Send the request
         res = _request(req, CreateNodeResponse, PATH_CREATE_NODE)
         if res is None:
-            return
+            return None
 
         # Remember the node and the ping-loop thread
         nonlocal node, ping_thread
         node = res.node
         ping_thread = start_ping_loop(ping, ping_stop_event)
+        return node.node_id
 
     def delete_node() -> None:
         """Set delete_node."""
@@ -259,7 +270,7 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
         req = DeleteNodeRequest(node=node)
 
         # Send the request
-        res = _request(req, DeleteNodeResponse, PATH_CREATE_NODE)
+        res = _request(req, DeleteNodeResponse, PATH_DELETE_NODE)
         if res is None:
             return
 
@@ -267,41 +278,40 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
         node = None
 
     def receive() -> Optional[Message]:
-        """Receive next task from server."""
+        """Receive next Message from server."""
         # Get Node
         if node is None:
             log(ERROR, "Node instance missing")
             return None
 
-        # Request instructions (task) from server
-        req = PullTaskInsRequest(node=node)
+        # Request instructions (message) from server
+        req = PullMessagesRequest(node=node)
 
         # Send the request
-        res = _request(req, PullTaskInsResponse, PATH_PULL_TASK_INS)
+        res = _request(req, PullMessagesResponse, PATH_PULL_MESSAGES)
         if res is None:
             return None
 
-        # Get the current TaskIns
-        task_ins: Optional[TaskIns] = get_task_ins(res)
+        # Get the current Messages
+        message_proto = None if len(res.messages_list) == 0 else res.messages_list[0]
 
-        # Discard the current TaskIns if not valid
-        if task_ins is not None and not (
-            task_ins.task.consumer.node_id == node.node_id
-            and validate_task_ins(task_ins)
+        # Discard the current message if not valid
+        if message_proto is not None and not (
+            message_proto.metadata.dst_node_id == node.node_id
         ):
-            task_ins = None
+            message_proto = None
 
         # Return the Message if available
         nonlocal metadata
         message = None
-        if task_ins is not None:
-            message = message_from_taskins(task_ins)
+        if message_proto is not None:
+            message = message_from_proto(message_proto)
             metadata = copy(message.metadata)
-            log(INFO, "[Node] POST /%s: success", PATH_PULL_TASK_INS)
+            log(INFO, "[Node] POST /%s: success", PATH_PULL_MESSAGES)
         return message
 
     def send(message: Message) -> None:
-        """Send task result back to server."""
+        """Send Message result back to server."""
         # Get Node
         if node is None:
             log(ERROR, "Node instance missing")
@@ -319,37 +329,60 @@ def http_request_response(  # pylint: disable=,R0913, R0914, R0915
             return
         metadata = None
 
-        # Construct TaskRes
-        task_res = message_to_taskres(message)
+        # Serialize ProtoBuf to bytes
+        message_proto = message_to_proto(message=message)
 
         # Serialize ProtoBuf to bytes
-        req = PushTaskResRequest(task_res_list=[task_res])
+        req = PushMessagesRequest(node=node, messages_list=[message_proto])
 
         # Send the request
-        res = _request(req, PushTaskResResponse, PATH_PUSH_TASK_RES)
+        res = _request(req, PushMessagesResponse, PATH_PUSH_MESSAGES)
         if res is None:
             return
 
         log(
             INFO,
             "[Node] POST /%s: success, created result %s",
-            PATH_PUSH_TASK_RES,
+            PATH_PUSH_MESSAGES,
             res.results,  # pylint: disable=no-member
         )
 
-    def get_run(run_id: int) -> Tuple[str, str]:
+    def get_run(run_id: int) -> Run:
         # Construct the request
-        req = GetRunRequest(run_id=run_id)
+        req = GetRunRequest(node=node, run_id=run_id)
 
         # Send the request
         res = _request(req, GetRunResponse, PATH_GET_RUN)
         if res is None:
-            return "", ""
+            return Run.create_empty(run_id)
 
-        return res.run.fab_id, res.run.fab_version
+        return run_from_proto(res.run)
+
+    def get_fab(fab_hash: str, run_id: int) -> Fab:
+        # Construct the request
+        req = GetFabRequest(node=node, hash_str=fab_hash, run_id=run_id)
+
+        # Send the request
+        res = _request(req, GetFabResponse, PATH_GET_FAB)
+        if res is None:
+            return Fab("", b"")
+
+        return Fab(
+            res.fab.hash_str,
+            res.fab.content,
+        )
 
     try:
         # Yield methods
-        yield (receive, send, create_node, delete_node, get_run)
+        yield (receive, send, create_node, delete_node, get_run, get_fab)
     except Exception as exc:  # pylint: disable=broad-except
         log(ERROR, exc)
+    # Cleanup
+    finally:
+        try:
+            if node is not None:
+                # Disable retrying
+                retry_invoker.max_tries = 1
+                delete_node()
+        except RequestsConnectionError:
+            pass

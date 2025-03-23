@@ -16,25 +16,25 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, Tuple
+from typing import Callable
 
 from flwr.client.client_app import ClientApp
 from flwr.common.context import Context
 from flwr.common.message import Message
-from flwr.common.typing import ConfigsRecordValues
+from flwr.common.typing import ConfigRecordValues
 
-BackendConfig = Dict[str, Dict[str, ConfigsRecordValues]]
+BackendConfig = dict[str, dict[str, ConfigRecordValues]]
 
 
 class Backend(ABC):
     """Abstract base class for a Simulation Engine Backend."""
 
-    def __init__(self, backend_config: BackendConfig, work_dir: str) -> None:
+    def __init__(self, backend_config: BackendConfig) -> None:
         """Construct a backend."""
 
     @abstractmethod
-    async def build(self) -> None:
-        """Build backend asynchronously.
+    def build(self, app_fn: Callable[[], ClientApp]) -> None:
+        """Build backend.
 
         Different components need to be in place before workers in a backend are ready
         to accept jobs. When this method finishes executing, the backend should be fully
@@ -45,7 +45,7 @@ class Backend(ABC):
     def num_workers(self) -> int:
         """Return number of workers in the backend.
 
-        This is the number of TaskIns that can be processed concurrently.
+        This is the number of Messages that can be processed concurrently.
         """
         return 0
 
@@ -54,14 +54,13 @@ class Backend(ABC):
         """Report whether a backend worker is idle and can therefore run a ClientApp."""
 
     @abstractmethod
-    async def terminate(self) -> None:
+    def terminate(self) -> None:
         """Terminate backend."""
 
     @abstractmethod
-    async def process_message(
+    def process_message(
         self,
-        app: Callable[[], ClientApp],
         message: Message,
         context: Context,
-    ) -> Tuple[Message, Context]:
+    ) -> tuple[Message, Context]:
         """Submit a job to the backend."""

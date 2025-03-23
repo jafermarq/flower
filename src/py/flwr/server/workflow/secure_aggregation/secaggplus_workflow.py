@@ -18,17 +18,17 @@
 import random
 from dataclasses import dataclass, field
 from logging import DEBUG, ERROR, INFO, WARN
-from typing import Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Optional, Union, cast
 
-import flwr.common.recordset_compat as compat
+import flwr.common.recorddict_compat as compat
 from flwr.common import (
-    ConfigsRecord,
+    ConfigRecord,
     Context,
     FitRes,
     Message,
     MessageType,
     NDArrays,
-    RecordSet,
+    RecordDict,
     bytes_to_ndarray,
     log,
     ndarrays_to_parameters,
@@ -55,7 +55,7 @@ from flwr.common.secure_aggregation.secaggplus_constants import (
 from flwr.common.secure_aggregation.secaggplus_utils import pseudo_rand_gen
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.compat.legacy_context import LegacyContext
-from flwr.server.driver import Driver
+from flwr.server.grid import Grid
 
 from ..constant import MAIN_CONFIGS_RECORD, MAIN_PARAMS_RECORD
 from ..constant import Key as WorkflowKey
@@ -65,22 +65,23 @@ from ..constant import Key as WorkflowKey
 class WorkflowState:  # pylint: disable=R0902
     """The state of the SecAgg+ protocol."""
 
-    nid_to_proxies: Dict[int, ClientProxy] = field(default_factory=dict)
-    nid_to_fitins: Dict[int, RecordSet] = field(default_factory=dict)
-    sampled_node_ids: Set[int] = field(default_factory=set)
-    active_node_ids: Set[int] = field(default_factory=set)
+    nid_to_proxies: dict[int, ClientProxy] = field(default_factory=dict)
+    nid_to_fitins: dict[int, RecordDict] = field(default_factory=dict)
+    sampled_node_ids: set[int] = field(default_factory=set)
+    active_node_ids: set[int] = field(default_factory=set)
     num_shares: int = 0
     threshold: int = 0
     clipping_range: float = 0.0
     quantization_range: int = 0
     mod_range: int = 0
     max_weight: float = 0.0
-    nid_to_neighbours: Dict[int, Set[int]] = field(default_factory=dict)
-    nid_to_publickeys: Dict[int, List[bytes]] = field(default_factory=dict)
-    forward_srcs: Dict[int, List[int]] = field(default_factory=dict)
-    forward_ciphertexts: Dict[int, List[bytes]] = field(default_factory=dict)
+    nid_to_neighbours: dict[int, set[int]] = field(default_factory=dict)
+    nid_to_publickeys: dict[int, list[bytes]] = field(default_factory=dict)
+    forward_srcs: dict[int, list[int]] = field(default_factory=dict)
+    forward_ciphertexts: dict[int, list[bytes]] = field(default_factory=dict)
     aggregate_ndarrays: NDArrays = field(default_factory=list)
-    legacy_results: List[Tuple[ClientProxy, FitRes]] = field(default_factory=list)
+    legacy_results: list[tuple[ClientProxy, FitRes]] = field(default_factory=list)
+    failures: list[Exception] = field(default_factory=list)
 
 
 class SecAggPlusWorkflow:
@@ -98,6 +99,7 @@ class SecAggPlusWorkflow:
     contributions to compute the weighted average of model parameters.
 
     The protocol involves four main stages:
+
     - 'setup': Send SecAgg+ configuration to clients and collect their public keys.
     - 'share keys': Broadcast public keys among clients and collect encrypted secret
       key shares.
@@ -184,7 +186,7 @@ class SecAggPlusWorkflow:
 
         self._check_init_params()
 
-    def __call__(self, driver: Driver, context: Context) -> None:
+    def __call__(self, grid: Grid, context: Context) -> None:
         """Run the SecAgg+ protocol."""
         if not isinstance(context, LegacyContext):
             raise TypeError(
@@ -200,7 +202,7 @@ class SecAggPlusWorkflow:
         )
         log(INFO, "Secure aggregation commencing.")
         for step in steps:
-            if not step(driver, context, state):
+            if not step(grid, context, state):
                 log(INFO, "Secure aggregation halted.")
                 return
         log(INFO, "Secure aggregation completed.")
@@ -277,14 +279,14 @@ class SecAggPlusWorkflow:
         return True
 
     def setup_stage(  # pylint: disable=R0912, R0914, R0915
-        self, driver: Driver, context: LegacyContext, state: WorkflowState
+        self, grid: Grid, context: LegacyContext, state: WorkflowState
     ) -> bool:
         """Execute the 'setup' stage."""
         # Obtain fit instructions
-        cfg = context.state.configs_records[MAIN_CONFIGS_RECORD]
+        cfg = context.state.config_records[MAIN_CONFIGS_RECORD]
         current_round = cast(int, cfg[WorkflowKey.CURRENT_ROUND])
-        parameters = compat.parametersrecord_to_parameters(
-            context.state.parameters_records[MAIN_PARAMS_RECORD],
+        parameters = compat.arrayrecord_to_parameters(
+            context.state.array_records[MAIN_PARAMS_RECORD],
             keep_input=True,
         )
         proxy_fitins_lst = context.strategy.configure_fit(
@@ -301,7 +303,7 @@ class SecAggPlusWorkflow:
         )
 
         state.nid_to_fitins = {
-            proxy.node_id: compat.fitins_to_recordset(fitins, True)
+            proxy.node_id: compat.fitins_to_recorddict(fitins, True)
             for proxy, fitins in proxy_fitins_lst
         }
         state.nid_to_proxies = {proxy.node_id: proxy for proxy, _ in proxy_fitins_lst}
@@ -364,14 +366,14 @@ class SecAggPlusWorkflow:
         state.sampled_node_ids = state.active_node_ids
 
         # Send setup configuration to clients
-        cfgs_record = ConfigsRecord(sa_params_dict)  # type: ignore
-        content = RecordSet(configs_records={RECORD_KEY_CONFIGS: cfgs_record})
+        cfg_record = ConfigRecord(sa_params_dict)  # type: ignore
+        content = RecordDict({RECORD_KEY_CONFIGS: cfg_record})
 
         def make(nid: int) -> Message:
-            return driver.create_message(
+            return Message(
                 content=content,
-                message_type=MessageType.TRAIN,
                 dst_node_id=nid,
+                message_type=MessageType.TRAIN,
                 group_id=str(cfg[WorkflowKey.CURRENT_ROUND]),
             )
 
@@ -380,7 +382,7 @@ class SecAggPlusWorkflow:
             "[Stage 0] Sending configurations to %s clients.",
             len(state.active_node_ids),
         )
-        msgs = driver.send_and_receive(
+        msgs = grid.send_and_receive(
             [make(node_id) for node_id in state.active_node_ids], timeout=self.timeout
         )
         state.active_node_ids = {
@@ -394,8 +396,9 @@ class SecAggPlusWorkflow:
 
         for msg in msgs:
             if msg.has_error():
+                state.failures.append(Exception(msg.error))
                 continue
-            key_dict = msg.content.configs_records[RECORD_KEY_CONFIGS]
+            key_dict = msg.content.config_records[RECORD_KEY_CONFIGS]
             node_id = msg.metadata.src_node_id
             pk1, pk2 = key_dict[Key.PUBLIC_KEY_1], key_dict[Key.PUBLIC_KEY_2]
             state.nid_to_publickeys[node_id] = [cast(bytes, pk1), cast(bytes, pk2)]
@@ -403,22 +406,22 @@ class SecAggPlusWorkflow:
         return self._check_threshold(state)
 
     def share_keys_stage(  # pylint: disable=R0914
-        self, driver: Driver, context: LegacyContext, state: WorkflowState
+        self, grid: Grid, context: LegacyContext, state: WorkflowState
     ) -> bool:
         """Execute the 'share keys' stage."""
-        cfg = context.state.configs_records[MAIN_CONFIGS_RECORD]
+        cfg = context.state.config_records[MAIN_CONFIGS_RECORD]
 
         def make(nid: int) -> Message:
             neighbours = state.nid_to_neighbours[nid] & state.active_node_ids
-            cfgs_record = ConfigsRecord(
+            cfg_record = ConfigRecord(
                 {str(nid): state.nid_to_publickeys[nid] for nid in neighbours}
             )
-            cfgs_record[Key.STAGE] = Stage.SHARE_KEYS
-            content = RecordSet(configs_records={RECORD_KEY_CONFIGS: cfgs_record})
-            return driver.create_message(
+            cfg_record[Key.STAGE] = Stage.SHARE_KEYS
+            content = RecordDict({RECORD_KEY_CONFIGS: cfg_record})
+            return Message(
                 content=content,
-                message_type=MessageType.TRAIN,
                 dst_node_id=nid,
+                message_type=MessageType.TRAIN,
                 group_id=str(cfg[WorkflowKey.CURRENT_ROUND]),
             )
 
@@ -428,7 +431,7 @@ class SecAggPlusWorkflow:
             "[Stage 1] Forwarding public keys to %s clients.",
             len(state.active_node_ids),
         )
-        msgs = driver.send_and_receive(
+        msgs = grid.send_and_receive(
             [make(node_id) for node_id in state.active_node_ids], timeout=self.timeout
         )
         state.active_node_ids = {
@@ -441,20 +444,23 @@ class SecAggPlusWorkflow:
         )
 
         # Build forward packet list dictionary
-        srcs: List[int] = []
-        dsts: List[int] = []
-        ciphertexts: List[bytes] = []
-        fwd_ciphertexts: Dict[int, List[bytes]] = {
+        srcs: list[int] = []
+        dsts: list[int] = []
+        ciphertexts: list[bytes] = []
+        fwd_ciphertexts: dict[int, list[bytes]] = {
             nid: [] for nid in state.active_node_ids
         }  # dest node ID -> list of ciphertexts
-        fwd_srcs: Dict[int, List[int]] = {
+        fwd_srcs: dict[int, list[int]] = {
             nid: [] for nid in state.active_node_ids
         }  # dest node ID -> list of src node IDs
         for msg in msgs:
+            if msg.has_error():
+                state.failures.append(Exception(msg.error))
+                continue
             node_id = msg.metadata.src_node_id
-            res_dict = msg.content.configs_records[RECORD_KEY_CONFIGS]
-            dst_lst = cast(List[int], res_dict[Key.DESTINATION_LIST])
-            ctxt_lst = cast(List[bytes], res_dict[Key.CIPHERTEXT_LIST])
+            res_dict = msg.content.config_records[RECORD_KEY_CONFIGS]
+            dst_lst = cast(list[int], res_dict[Key.DESTINATION_LIST])
+            ctxt_lst = cast(list[bytes], res_dict[Key.CIPHERTEXT_LIST])
             srcs += [node_id] * len(dst_lst)
             dsts += dst_lst
             ciphertexts += ctxt_lst
@@ -470,25 +476,25 @@ class SecAggPlusWorkflow:
         return self._check_threshold(state)
 
     def collect_masked_vectors_stage(
-        self, driver: Driver, context: LegacyContext, state: WorkflowState
+        self, grid: Grid, context: LegacyContext, state: WorkflowState
     ) -> bool:
         """Execute the 'collect masked vectors' stage."""
-        cfg = context.state.configs_records[MAIN_CONFIGS_RECORD]
+        cfg = context.state.config_records[MAIN_CONFIGS_RECORD]
 
         # Send secret key shares to clients (plus FitIns) and collect masked vectors
         def make(nid: int) -> Message:
-            cfgs_dict = {
+            cfg_dict = {
                 Key.STAGE: Stage.COLLECT_MASKED_VECTORS,
                 Key.CIPHERTEXT_LIST: state.forward_ciphertexts[nid],
                 Key.SOURCE_LIST: state.forward_srcs[nid],
             }
-            cfgs_record = ConfigsRecord(cfgs_dict)  # type: ignore
+            cfg_record = ConfigRecord(cfg_dict)  # type: ignore
             content = state.nid_to_fitins[nid]
-            content.configs_records[RECORD_KEY_CONFIGS] = cfgs_record
-            return driver.create_message(
+            content.config_records[RECORD_KEY_CONFIGS] = cfg_record
+            return Message(
                 content=content,
-                message_type=MessageType.TRAIN,
                 dst_node_id=nid,
+                message_type=MessageType.TRAIN,
                 group_id=str(cfg[WorkflowKey.CURRENT_ROUND]),
             )
 
@@ -497,7 +503,7 @@ class SecAggPlusWorkflow:
             "[Stage 2] Forwarding encrypted key shares to %s clients.",
             len(state.active_node_ids),
         )
-        msgs = driver.send_and_receive(
+        msgs = grid.send_and_receive(
             [make(node_id) for node_id in state.active_node_ids], timeout=self.timeout
         )
         state.active_node_ids = {
@@ -515,8 +521,11 @@ class SecAggPlusWorkflow:
         # Sum collected masked vectors and compute active/dead node IDs
         masked_vector = None
         for msg in msgs:
-            res_dict = msg.content.configs_records[RECORD_KEY_CONFIGS]
-            bytes_list = cast(List[bytes], res_dict[Key.MASKED_PARAMETERS])
+            if msg.has_error():
+                state.failures.append(Exception(msg.error))
+                continue
+            res_dict = msg.content.config_records[RECORD_KEY_CONFIGS]
+            bytes_list = cast(list[bytes], res_dict[Key.MASKED_PARAMETERS])
             client_masked_vec = [bytes_to_ndarray(b) for b in bytes_list]
             if masked_vector is None:
                 masked_vector = client_masked_vec
@@ -528,17 +537,20 @@ class SecAggPlusWorkflow:
 
         # Backward compatibility with Strategy
         for msg in msgs:
-            fitres = compat.recordset_to_fitres(msg.content, True)
+            if msg.has_error():
+                state.failures.append(Exception(msg.error))
+                continue
+            fitres = compat.recorddict_to_fitres(msg.content, True)
             proxy = state.nid_to_proxies[msg.metadata.src_node_id]
             state.legacy_results.append((proxy, fitres))
 
         return self._check_threshold(state)
 
     def unmask_stage(  # pylint: disable=R0912, R0914, R0915
-        self, driver: Driver, context: LegacyContext, state: WorkflowState
+        self, grid: Grid, context: LegacyContext, state: WorkflowState
     ) -> bool:
         """Execute the 'unmask' stage."""
-        cfg = context.state.configs_records[MAIN_CONFIGS_RECORD]
+        cfg = context.state.config_records[MAIN_CONFIGS_RECORD]
         current_round = cast(int, cfg[WorkflowKey.CURRENT_ROUND])
 
         # Construct active node IDs and dead node IDs
@@ -548,17 +560,17 @@ class SecAggPlusWorkflow:
         # Send secure IDs of active and dead clients and collect key shares from clients
         def make(nid: int) -> Message:
             neighbours = state.nid_to_neighbours[nid]
-            cfgs_dict = {
+            cfg_dict = {
                 Key.STAGE: Stage.UNMASK,
                 Key.ACTIVE_NODE_ID_LIST: list(neighbours & active_nids),
                 Key.DEAD_NODE_ID_LIST: list(neighbours & dead_nids),
             }
-            cfgs_record = ConfigsRecord(cfgs_dict)  # type: ignore
-            content = RecordSet(configs_records={RECORD_KEY_CONFIGS: cfgs_record})
-            return driver.create_message(
+            cfg_record = ConfigRecord(cfg_dict)  # type: ignore
+            content = RecordDict({RECORD_KEY_CONFIGS: cfg_record})
+            return Message(
                 content=content,
-                message_type=MessageType.TRAIN,
                 dst_node_id=nid,
+                message_type=MessageType.TRAIN,
                 group_id=str(current_round),
             )
 
@@ -567,7 +579,7 @@ class SecAggPlusWorkflow:
             "[Stage 3] Requesting key shares from %s clients to remove masks.",
             len(state.active_node_ids),
         )
-        msgs = driver.send_and_receive(
+        msgs = grid.send_and_receive(
             [make(node_id) for node_id in state.active_node_ids], timeout=self.timeout
         )
         state.active_node_ids = {
@@ -580,13 +592,16 @@ class SecAggPlusWorkflow:
         )
 
         # Build collected shares dict
-        collected_shares_dict: Dict[int, List[bytes]] = {}
+        collected_shares_dict: dict[int, list[bytes]] = {}
         for nid in state.sampled_node_ids:
             collected_shares_dict[nid] = []
         for msg in msgs:
-            res_dict = msg.content.configs_records[RECORD_KEY_CONFIGS]
-            nids = cast(List[int], res_dict[Key.NODE_ID_LIST])
-            shares = cast(List[bytes], res_dict[Key.SHARE_LIST])
+            if msg.has_error():
+                state.failures.append(Exception(msg.error))
+                continue
+            res_dict = msg.content.config_records[RECORD_KEY_CONFIGS]
+            nids = cast(list[int], res_dict[Key.NODE_ID_LIST])
+            shares = cast(list[bytes], res_dict[Key.SHARE_LIST])
             for owner_nid, share in zip(nids, shares):
                 collected_shares_dict[owner_nid].append(share)
 
@@ -652,17 +667,17 @@ class SecAggPlusWorkflow:
             INFO,
             "aggregate_fit: received %s results and %s failures",
             len(results),
-            0,
+            len(state.failures),
         )
-        aggregated_result = context.strategy.aggregate_fit(current_round, results, [])
+        aggregated_result = context.strategy.aggregate_fit(
+            current_round, results, state.failures  # type: ignore
+        )
         parameters_aggregated, metrics_aggregated = aggregated_result
 
         # Update the parameters and write history
         if parameters_aggregated:
-            paramsrecord = compat.parameters_to_parametersrecord(
-                parameters_aggregated, True
-            )
-            context.state.parameters_records[MAIN_PARAMS_RECORD] = paramsrecord
+            arr_record = compat.parameters_to_arrayrecord(parameters_aggregated, True)
+            context.state.array_records[MAIN_PARAMS_RECORD] = arr_record
             context.history.add_metrics_distributed_fit(
                 server_round=current_round, metrics=metrics_aggregated
             )

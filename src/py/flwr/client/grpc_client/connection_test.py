@@ -17,14 +17,15 @@
 
 import concurrent.futures
 import socket
+from collections.abc import Iterator
 from contextlib import closing
-from typing import Iterator, cast
+from typing import cast
 from unittest.mock import patch
 
 import grpc
 
-from flwr.common import DEFAULT_TTL, ConfigsRecord, Message, Metadata, RecordSet
-from flwr.common import recordset_compat as compat
+from flwr.common import ConfigRecord, Message, RecordDict
+from flwr.common import recorddict_compat as compat
 from flwr.common.constant import MessageTypeLegacy
 from flwr.common.retry_invoker import RetryInvoker, exponential
 from flwr.common.typing import Code, GetPropertiesRes, Status
@@ -43,32 +44,16 @@ SERVER_MESSAGE = ServerMessage(get_properties_ins=ServerMessage.GetPropertiesIns
 SERVER_MESSAGE_RECONNECT = ServerMessage(reconnect_ins=ServerMessage.ReconnectIns())
 
 MESSAGE_GET_PROPERTIES = Message(
-    metadata=Metadata(
-        run_id=0,
-        message_id="",
-        src_node_id=0,
-        dst_node_id=0,
-        reply_to_message="",
-        group_id="",
-        ttl=DEFAULT_TTL,
-        message_type=MessageTypeLegacy.GET_PROPERTIES,
-    ),
-    content=compat.getpropertiesres_to_recordset(
+    content=compat.getpropertiesres_to_recorddict(
         GetPropertiesRes(Status(Code.OK, ""), {})
     ),
+    dst_node_id=0,
+    message_type=MessageTypeLegacy.GET_PROPERTIES,
 )
 MESSAGE_DISCONNECT = Message(
-    metadata=Metadata(
-        run_id=0,
-        message_id="",
-        src_node_id=0,
-        dst_node_id=0,
-        reply_to_message="",
-        group_id="",
-        ttl=DEFAULT_TTL,
-        message_type="reconnect",
-    ),
-    content=RecordSet(configs_records={"config": ConfigsRecord({"reason": 0})}),
+    content=RecordDict({"config": ConfigRecord({"reason": 0})}),
+    dst_node_id=0,
+    message_type="reconnect",
 )
 
 
@@ -138,7 +123,7 @@ def test_integration_connection() -> None:
                 max_time=None,
             ),
         ) as conn:
-            receive, send, _, _, _ = conn
+            receive, send, _, _, _, _ = conn
 
             # Setup processing loop
             while True:

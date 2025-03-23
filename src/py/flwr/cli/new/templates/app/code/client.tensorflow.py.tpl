@@ -1,27 +1,31 @@
-"""$project_name: A Flower / TensorFlow app."""
+"""$project_name: A Flower / $framework_str app."""
 
-import os
+from flwr.client import NumPyClient, ClientApp
+from flwr.common import Context
 
-import tensorflow as tf
-from flwr.client import ClientApp, NumPyClient
-from flwr_datasets import FederatedDataset
+from $import_name.task import load_data, load_model
 
 
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-
-# Define Flower client
+# Define Flower Client and client_fn
 class FlowerClient(NumPyClient):
-    def __init__(self, model, train_data, test_data):
+    def __init__(
+        self, model, data, epochs, batch_size, verbose
+    ):
         self.model = model
-        self.x_train, self.y_train = train_data
-        self.x_test, self.y_test = test_data
-        
-    def get_parameters(self, config):
-        return self.model.get_weights()
+        self.x_train, self.y_train, self.x_test, self.y_test = data
+        self.epochs = epochs
+        self.batch_size = batch_size
+        self.verbose = verbose
 
     def fit(self, parameters, config):
         self.model.set_weights(parameters)
-        self.model.fit(self.x_train, self.y_train, epochs=1, batch_size=32, verbose=0)
+        self.model.fit(
+            self.x_train,
+            self.y_train,
+            epochs=self.epochs,
+            batch_size=self.batch_size,
+            verbose=self.verbose,
+        )
         return self.model.get_weights(), len(self.x_train), {}
 
     def evaluate(self, parameters, config):
@@ -30,25 +34,21 @@ class FlowerClient(NumPyClient):
         return loss, len(self.x_test), {"accuracy": accuracy}
 
 
-fds = FederatedDataset(dataset="cifar10", partitioners={"train": 2})
+def client_fn(context: Context):
+    # Load model and data
+    net = load_model()
 
-def client_fn(cid: str):
-    """Create and return an instance of Flower `Client`."""
+    partition_id = context.node_config["partition-id"]
+    num_partitions = context.node_config["num-partitions"]
+    data = load_data(partition_id, num_partitions)
+    epochs = context.run_config["local-epochs"]
+    batch_size = context.run_config["batch-size"]
+    verbose = context.run_config.get("verbose")
 
-    # Load model and data (MobileNetV2, CIFAR-10)
-    model = tf.keras.applications.MobileNetV2((32, 32, 3), classes=10, weights=None)
-    model.compile("adam", "sparse_categorical_crossentropy", metrics=["accuracy"])
-
-    # Download and partition dataset
-    partition = fds.load_partition(int(cid), "train")
-    partition.set_format("numpy")
-
-    # Divide data on each node: 80% train, 20% test
-    partition = partition.train_test_split(test_size=0.2, seed=42)
-    train_data = partition["train"]["img"] / 255.0, partition["train"]["label"]
-    test_data = partition["test"]["img"] / 255.0, partition["test"]["label"]
-
-    return FlowerClient(model, train_data, test_data).to_client()
+    # Return Client instance
+    return FlowerClient(
+        net, data, epochs, batch_size, verbose
+    ).to_client()
 
 
 # Flower ClientApp

@@ -14,18 +14,54 @@
 # ==============================================================================
 """Utility to validate the `pyproject.toml` file."""
 
+
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional, Union
 
 import tomli
+import typer
 
-from flwr.common import object_ref
+from flwr.common.config import (
+    fuse_dicts,
+    get_fab_config,
+    get_metadata_from_config,
+    parse_config_args,
+    validate_config,
+)
 
 
-def load_and_validate_with_defaults(
+def get_fab_metadata(fab_file: Union[Path, bytes]) -> tuple[str, str]:
+    """Extract the fab_id and the fab_version from a FAB file or path.
+
+    Parameters
+    ----------
+    fab_file : Union[Path, bytes]
+        The Flower App Bundle file to validate and extract the metadata from.
+        It can either be a path to the file or the file itself as bytes.
+
+    Returns
+    -------
+    Tuple[str, str]
+        The `fab_id` and `fab_version` of the given Flower App Bundle.
+    """
+    return get_metadata_from_config(get_fab_config(fab_file))
+
+
+def load_and_validate(
     path: Optional[Path] = None,
-) -> Tuple[Optional[Dict[str, Any]], List[str], List[str]]:
+    check_module: bool = True,
+) -> tuple[Optional[dict[str, Any]], list[str], list[str]]:
     """Load and validate pyproject.toml as dict.
+
+    Parameters
+    ----------
+    path : Optional[Path] (default: None)
+        The path of the Flower App config file to load. By default it
+        will try to use `pyproject.toml` inside the current directory.
+    check_module: bool (default: True)
+        Whether the validity of the Python module should be checked.
+        This requires the project to be installed in the currently
+        running environment. True by default.
 
     Returns
     -------
@@ -33,6 +69,9 @@ def load_and_validate_with_defaults(
         A tuple with the optional config in case it exists and is valid
         and associated errors and warnings.
     """
+    if path is None:
+        path = Path.cwd() / "pyproject.toml"
+
     config = load(path)
 
     if config is None:
@@ -42,104 +81,140 @@ def load_and_validate_with_defaults(
         ]
         return (None, errors, [])
 
-    is_valid, errors, warnings = validate(config)
+    is_valid, errors, warnings = validate_config(config, check_module, path.parent)
 
     if not is_valid:
         return (None, errors, warnings)
 
-    # Apply defaults
-    defaults = {
-        "flower": {
-            "engine": {"name": "simulation", "simulation": {"supernode": {"num": 2}}}
-        }
-    }
-    config = apply_defaults(config, defaults)
-
     return (config, errors, warnings)
 
 
-def load(path: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def load(toml_path: Path) -> Optional[dict[str, Any]]:
     """Load pyproject.toml and return as dict."""
-    if path is None:
-        cur_dir = Path.cwd()
-        toml_path = cur_dir / "pyproject.toml"
-    else:
-        toml_path = path
-
     if not toml_path.is_file():
         return None
 
-    with toml_path.open(encoding="utf-8") as toml_file:
-        data = tomli.loads(toml_file.read())
-        return data
+    with toml_path.open("rb") as toml_file:
+        try:
+            return tomli.load(toml_file)
+        except tomli.TOMLDecodeError:
+            return None
 
 
-# pylint: disable=too-many-branches
-def validate_fields(config: Dict[str, Any]) -> Tuple[bool, List[str], List[str]]:
-    """Validate pyproject.toml fields."""
-    errors = []
-    warnings = []
+def process_loaded_project_config(
+    config: Union[dict[str, Any], None], errors: list[str], warnings: list[str]
+) -> dict[str, Any]:
+    """Process and return the loaded project configuration.
 
-    if "project" not in config:
-        errors.append("Missing [project] section")
-    else:
-        if "name" not in config["project"]:
-            errors.append('Property "name" missing in [project]')
-        if "version" not in config["project"]:
-            errors.append('Property "version" missing in [project]')
-        if "description" not in config["project"]:
-            warnings.append('Recommended property "description" missing in [project]')
-        if "license" not in config["project"]:
-            warnings.append('Recommended property "license" missing in [project]')
-        if "authors" not in config["project"]:
-            warnings.append('Recommended property "authors" missing in [project]')
+    This function handles errors and warnings from the `load_and_validate` function,
+    exits on critical issues, and returns the validated configuration.
+    """
+    if config is None:
+        typer.secho(
+            "Project configuration could not be loaded.\n"
+            "pyproject.toml is invalid:\n"
+            + "\n".join([f"- {line}" for line in errors]),
+            fg=typer.colors.RED,
+            bold=True,
+        )
+        raise typer.Exit(code=1)
 
-    if "flower" not in config:
-        errors.append("Missing [flower] section")
-    else:
-        if "publisher" not in config["flower"]:
-            errors.append('Property "publisher" missing in [flower]')
-        if "components" not in config["flower"]:
-            errors.append("Missing [flower.components] section")
-        else:
-            if "serverapp" not in config["flower"]["components"]:
-                errors.append('Property "serverapp" missing in [flower.components]')
-            if "clientapp" not in config["flower"]["components"]:
-                errors.append('Property "clientapp" missing in [flower.components]')
+    if warnings:
+        typer.secho(
+            "Project configuration is missing the following "
+            "recommended properties:\n" + "\n".join([f"- {line}" for line in warnings]),
+            fg=typer.colors.RED,
+            bold=True,
+        )
 
-    return len(errors) == 0, errors, warnings
+    typer.secho("Success", fg=typer.colors.GREEN)
 
-
-def validate(config: Dict[str, Any]) -> Tuple[bool, List[str], List[str]]:
-    """Validate pyproject.toml."""
-    is_valid, errors, warnings = validate_fields(config)
-
-    if not is_valid:
-        return False, errors, warnings
-
-    # Validate serverapp
-    is_valid, reason = object_ref.validate(config["flower"]["components"]["serverapp"])
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], []
-
-    # Validate clientapp
-    is_valid, reason = object_ref.validate(config["flower"]["components"]["clientapp"])
-
-    if not is_valid and isinstance(reason, str):
-        return False, [reason], []
-
-    return True, [], []
-
-
-def apply_defaults(
-    config: Dict[str, Any],
-    defaults: Dict[str, Any],
-) -> Dict[str, Any]:
-    """Apply defaults to config."""
-    for key in defaults:
-        if key in config:
-            if isinstance(config[key], dict) and isinstance(defaults[key], dict):
-                apply_defaults(config[key], defaults[key])
-        else:
-            config[key] = defaults[key]
     return config
+
+
+def validate_federation_in_project_config(
+    federation: Optional[str],
+    config: dict[str, Any],
+    overrides: Optional[list[str]] = None,
+) -> tuple[str, dict[str, Any]]:
+    """Validate the federation name in the Flower project configuration."""
+    federation = federation or config["tool"]["flwr"]["federations"].get("default")
+
+    if federation is None:
+        typer.secho(
+            "❌ No federation name was provided and the project's `pyproject.toml` "
+            "doesn't declare a default federation (with an Exec API address or an "
+            "`options.num-supernodes` value).",
+            fg=typer.colors.RED,
+            bold=True,
+        )
+        raise typer.Exit(code=1)
+
+    # Validate the federation exists in the configuration
+    federation_config = config["tool"]["flwr"]["federations"].get(federation)
+    if federation_config is None:
+        available_feds = {
+            fed for fed in config["tool"]["flwr"]["federations"] if fed != "default"
+        }
+        typer.secho(
+            f"❌ There is no `{federation}` federation declared in the "
+            "`pyproject.toml`.\n The following federations were found:\n\n"
+            + "\n".join(available_feds),
+            fg=typer.colors.RED,
+            bold=True,
+        )
+        raise typer.Exit(code=1)
+
+    # Override the federation configuration if provided
+    if overrides:
+        overrides_dict = parse_config_args(overrides, flatten=False)
+        federation_config = fuse_dicts(federation_config, overrides_dict)
+
+    return federation, federation_config
+
+
+def validate_certificate_in_federation_config(
+    app: Path, federation_config: dict[str, Any]
+) -> tuple[bool, Optional[bytes]]:
+    """Validate the certificates in the Flower project configuration."""
+    insecure_str = federation_config.get("insecure")
+    if root_certificates := federation_config.get("root-certificates"):
+        root_certificates_bytes = (app / root_certificates).read_bytes()
+        if insecure := bool(insecure_str):
+            typer.secho(
+                "❌ `root-certificates` were provided but the `insecure` parameter "
+                "is set to `True`.",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+            raise typer.Exit(code=1)
+    else:
+        root_certificates_bytes = None
+        if insecure_str is None:
+            typer.secho(
+                "❌ To disable TLS, set `insecure = true` in `pyproject.toml`.",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+            raise typer.Exit(code=1)
+        if not (insecure := bool(insecure_str)):
+            typer.secho(
+                "❌ No certificate were given yet `insecure` is set to `False`.",
+                fg=typer.colors.RED,
+                bold=True,
+            )
+            raise typer.Exit(code=1)
+
+    return insecure, root_certificates_bytes
+
+
+def exit_if_no_address(federation_config: dict[str, Any], cmd: str) -> None:
+    """Exit if the provided federation_config has no "address" key."""
+    if "address" not in federation_config:
+        typer.secho(
+            f"❌ `flwr {cmd}` currently works with a SuperLink. Ensure that the correct"
+            "SuperLink (Exec API) address is provided in `pyproject.toml`.",
+            fg=typer.colors.RED,
+            bold=True,
+        )
+        raise typer.Exit(code=1)

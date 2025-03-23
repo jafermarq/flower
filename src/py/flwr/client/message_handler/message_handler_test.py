@@ -1,4 +1,4 @@
-# Copyright 2020 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2022 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,14 +15,12 @@
 """Client-side message handler tests."""
 
 
-import time
 import unittest
 import uuid
 from copy import copy
-from typing import List
 
 from flwr.client import Client
-from flwr.client.typing import ClientFn
+from flwr.client.typing import ClientFnExt
 from flwr.common import (
     DEFAULT_TTL,
     Code,
@@ -35,15 +33,16 @@ from flwr.common import (
     GetParametersRes,
     GetPropertiesIns,
     GetPropertiesRes,
-    Message,
     Metadata,
     Parameters,
-    RecordSet,
+    RecordDict,
     Status,
+    now,
 )
-from flwr.common import recordset_compat as compat
+from flwr.common import recorddict_compat as compat
 from flwr.common import typing
 from flwr.common.constant import MessageTypeLegacy
+from flwr.common.message import make_message
 
 from .message_handler import handle_legacy_message_from_msgtype, validate_out_message
 
@@ -113,8 +112,8 @@ class ClientWithProps(Client):
         )
 
 
-def _get_client_fn(client: Client) -> ClientFn:
-    def client_fn(cid: str) -> Client:  # pylint: disable=unused-argument
+def _get_client_fn(client: Client) -> ClientFnExt:
+    def client_fn(contex: Context) -> Client:  # pylint: disable=unused-argument
         return client
 
     return client_fn
@@ -124,26 +123,29 @@ def test_client_without_get_properties() -> None:
     """Test client implementing get_properties."""
     # Prepare
     client = ClientWithoutProps()
-    recordset = compat.getpropertiesins_to_recordset(GetPropertiesIns({}))
-    message = Message(
+    recorddict = compat.getpropertiesins_to_recorddict(GetPropertiesIns({}))
+    message = make_message(
         metadata=Metadata(
             run_id=123,
             message_id=str(uuid.uuid4()),
             group_id="some group ID",
             src_node_id=0,
             dst_node_id=1123,
-            reply_to_message="",
+            reply_to_message_id="",
+            created_at=now().timestamp(),
             ttl=DEFAULT_TTL,
             message_type=MessageTypeLegacy.GET_PROPERTIES,
         ),
-        content=recordset,
+        content=recorddict,
     )
 
     # Execute
     actual_msg = handle_legacy_message_from_msgtype(
         client_fn=_get_client_fn(client),
         message=message,
-        context=Context(state=RecordSet()),
+        context=Context(
+            run_id=2234, node_id=1123, node_config={}, state=RecordDict(), run_config={}
+        ),
     )
 
     # Assert
@@ -154,16 +156,18 @@ def test_client_without_get_properties() -> None:
         ),
         properties={},
     )
-    expected_rs = compat.getpropertiesres_to_recordset(expected_get_properties_res)
-    expected_msg = Message(
+    expected_rs = compat.getpropertiesres_to_recorddict(expected_get_properties_res)
+    expected_msg = make_message(
         metadata=Metadata(
             run_id=123,
             message_id="",
             group_id="some group ID",
             src_node_id=1123,
             dst_node_id=0,
-            reply_to_message=message.metadata.message_id,
-            ttl=actual_msg.metadata.ttl,  # computed based on [message].create_reply()
+            reply_to_message_id=message.metadata.message_id,
+            created_at=now().timestamp(),
+            # Computed based on Message(..., reply_to=[message])
+            ttl=actual_msg.metadata.ttl,
             message_type=MessageTypeLegacy.GET_PROPERTIES,
         ),
         content=expected_rs,
@@ -171,7 +175,7 @@ def test_client_without_get_properties() -> None:
 
     assert actual_msg.content == expected_msg.content
     # metadata.created_at will differ so let's exclude it from checks
-    attrs = actual_msg.metadata.__annotations__
+    attrs = vars(actual_msg.metadata)
     attrs_keys = list(attrs.keys())
     attrs_keys.remove("_created_at")
     # metadata.created_at will differ so let's exclude it from checks
@@ -188,26 +192,29 @@ def test_client_with_get_properties() -> None:
     """Test client not implementing get_properties."""
     # Prepare
     client = ClientWithProps()
-    recordset = compat.getpropertiesins_to_recordset(GetPropertiesIns({}))
-    message = Message(
+    recorddict = compat.getpropertiesins_to_recorddict(GetPropertiesIns({}))
+    message = make_message(
         metadata=Metadata(
             run_id=123,
             message_id=str(uuid.uuid4()),
             group_id="some group ID",
             src_node_id=0,
             dst_node_id=1123,
-            reply_to_message="",
+            reply_to_message_id="",
+            created_at=now().timestamp(),
             ttl=DEFAULT_TTL,
             message_type=MessageTypeLegacy.GET_PROPERTIES,
         ),
-        content=recordset,
+        content=recorddict,
     )
 
     # Execute
     actual_msg = handle_legacy_message_from_msgtype(
         client_fn=_get_client_fn(client),
         message=message,
-        context=Context(state=RecordSet()),
+        context=Context(
+            run_id=2234, node_id=1123, node_config={}, state=RecordDict(), run_config={}
+        ),
     )
 
     # Assert
@@ -218,23 +225,25 @@ def test_client_with_get_properties() -> None:
         ),
         properties={"str_prop": "val", "int_prop": 1},
     )
-    expected_rs = compat.getpropertiesres_to_recordset(expected_get_properties_res)
-    expected_msg = Message(
+    expected_rs = compat.getpropertiesres_to_recorddict(expected_get_properties_res)
+    expected_msg = make_message(
         metadata=Metadata(
             run_id=123,
             message_id="",
             group_id="some group ID",
             src_node_id=1123,
             dst_node_id=0,
-            reply_to_message=message.metadata.message_id,
-            ttl=actual_msg.metadata.ttl,  # computed based on [message].create_reply()
+            reply_to_message_id=message.metadata.message_id,
+            created_at=now().timestamp(),
+            # Computed based on Message(..., reply_to=[message])
+            ttl=actual_msg.metadata.ttl,
             message_type=MessageTypeLegacy.GET_PROPERTIES,
         ),
         content=expected_rs,
     )
 
     assert actual_msg.content == expected_msg.content
-    attrs = actual_msg.metadata.__annotations__
+    attrs = vars(actual_msg.metadata)
     attrs_keys = list(attrs.keys())
     attrs_keys.remove("_created_at")
     # metadata.created_at will differ so let's exclude it from checks
@@ -258,32 +267,32 @@ class TestMessageValidation(unittest.TestCase):
             message_id="qwerty",
             src_node_id=10,
             dst_node_id=20,
-            reply_to_message="",
+            reply_to_message_id="",
             group_id="group1",
+            created_at=now().timestamp(),
             ttl=DEFAULT_TTL,
-            message_type="mock",
+            message_type="evaluate",
         )
-        # We need to set created_at in this way
-        # since this `self.in_metadata` is used for tests
-        # without it ever being part of a Message
-        self.in_metadata.created_at = time.time()
 
         self.valid_out_metadata = Metadata(
             run_id=123,
             message_id="",
             src_node_id=20,
             dst_node_id=10,
-            reply_to_message="qwerty",
+            reply_to_message_id="qwerty",
             group_id="group1",
+            created_at=now().timestamp(),
             ttl=DEFAULT_TTL,
-            message_type="mock",
+            message_type="evaluate",
         )
-        self.common_content = RecordSet()
+        self.common_content = RecordDict()
 
     def test_valid_message(self) -> None:
         """Test a valid message."""
         # Prepare
-        valid_message = Message(metadata=self.valid_out_metadata, content=RecordSet())
+        valid_message = make_message(
+            metadata=self.valid_out_metadata, content=RecordDict()
+        )
 
         # Assert
         self.assertTrue(validate_out_message(valid_message, self.in_metadata))
@@ -291,13 +300,13 @@ class TestMessageValidation(unittest.TestCase):
     def test_invalid_message_run_id(self) -> None:
         """Test invalid messages."""
         # Prepare
-        msg = Message(metadata=self.valid_out_metadata, content=RecordSet())
+        msg = make_message(metadata=self.valid_out_metadata, content=RecordDict())
 
         # Execute
-        invalid_metadata_list: List[Metadata] = []
+        invalid_metadata_list: list[Metadata] = []
         attrs = list(vars(self.valid_out_metadata).keys())
         for attr in attrs:
-            if attr == "_partition_id":
+            if attr == "_delivered_at":
                 continue
             if attr == "_ttl":  # Skip configurable ttl
                 continue
@@ -318,5 +327,5 @@ class TestMessageValidation(unittest.TestCase):
 
         # Assert
         for invalid_metadata in invalid_metadata_list:
-            msg._metadata = invalid_metadata  # pylint: disable=protected-access
+            msg.__dict__["_metadata"] = invalid_metadata
             self.assertFalse(validate_out_message(msg, self.in_metadata))

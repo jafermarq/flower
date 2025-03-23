@@ -14,17 +14,22 @@
 # ==============================================================================
 """Record APIs."""
 
-from .configsrecord import ConfigsRecord
+
+from .arrayrecord import Array, ArrayRecord, ParametersRecord
+from .configrecord import ConfigRecord, ConfigsRecord
 from .conversion_utils import array_from_numpy
-from .metricsrecord import MetricsRecord
-from .parametersrecord import Array, ParametersRecord
-from .recordset import RecordSet
+from .metricrecord import MetricRecord, MetricsRecord
+from .recorddict import RecordDict, RecordSet
 
 __all__ = [
     "Array",
-    "array_from_numpy",
+    "ArrayRecord",
+    "ConfigRecord",
     "ConfigsRecord",
+    "MetricRecord",
     "MetricsRecord",
     "ParametersRecord",
+    "RecordDict",
     "RecordSet",
+    "array_from_numpy",
 ]

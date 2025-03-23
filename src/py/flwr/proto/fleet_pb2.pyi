@@ -3,8 +3,8 @@
 isort:skip_file
 """
 import builtins
+import flwr.proto.message_pb2
 import flwr.proto.node_pb2
-import flwr.proto.task_pb2
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
@@ -86,55 +86,60 @@ class PingResponse(google.protobuf.message.Message):
     def ClearField(self, field_name: typing_extensions.Literal["success",b"success"]) -> None: ...
 global___PingResponse = PingResponse
 
-class PullTaskInsRequest(google.protobuf.message.Message):
-    """PullTaskIns messages"""
+class PullMessagesRequest(google.protobuf.message.Message):
+    """PullMessages messages"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     NODE_FIELD_NUMBER: builtins.int
-    TASK_IDS_FIELD_NUMBER: builtins.int
+    MESSAGE_IDS_FIELD_NUMBER: builtins.int
     @property
     def node(self) -> flwr.proto.node_pb2.Node: ...
     @property
-    def task_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
+    def message_ids(self) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[typing.Text]: ...
     def __init__(self,
         *,
         node: typing.Optional[flwr.proto.node_pb2.Node] = ...,
-        task_ids: typing.Optional[typing.Iterable[typing.Text]] = ...,
+        message_ids: typing.Optional[typing.Iterable[typing.Text]] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["node",b"node"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["node",b"node","task_ids",b"task_ids"]) -> None: ...
-global___PullTaskInsRequest = PullTaskInsRequest
+    def ClearField(self, field_name: typing_extensions.Literal["message_ids",b"message_ids","node",b"node"]) -> None: ...
+global___PullMessagesRequest = PullMessagesRequest
 
-class PullTaskInsResponse(google.protobuf.message.Message):
+class PullMessagesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     RECONNECT_FIELD_NUMBER: builtins.int
-    TASK_INS_LIST_FIELD_NUMBER: builtins.int
+    MESSAGES_LIST_FIELD_NUMBER: builtins.int
     @property
     def reconnect(self) -> global___Reconnect: ...
     @property
-    def task_ins_list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskIns]: ...
+    def messages_list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.message_pb2.Message]: ...
     def __init__(self,
         *,
         reconnect: typing.Optional[global___Reconnect] = ...,
-        task_ins_list: typing.Optional[typing.Iterable[flwr.proto.task_pb2.TaskIns]] = ...,
+        messages_list: typing.Optional[typing.Iterable[flwr.proto.message_pb2.Message]] = ...,
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["reconnect",b"reconnect"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["reconnect",b"reconnect","task_ins_list",b"task_ins_list"]) -> None: ...
-global___PullTaskInsResponse = PullTaskInsResponse
+    def ClearField(self, field_name: typing_extensions.Literal["messages_list",b"messages_list","reconnect",b"reconnect"]) -> None: ...
+global___PullMessagesResponse = PullMessagesResponse
 
-class PushTaskResRequest(google.protobuf.message.Message):
-    """PushTaskRes messages"""
+class PushMessagesRequest(google.protobuf.message.Message):
+    """PushMessages messages"""
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    TASK_RES_LIST_FIELD_NUMBER: builtins.int
+    NODE_FIELD_NUMBER: builtins.int
+    MESSAGES_LIST_FIELD_NUMBER: builtins.int
     @property
-    def task_res_list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.task_pb2.TaskRes]: ...
+    def node(self) -> flwr.proto.node_pb2.Node: ...
+    @property
+    def messages_list(self) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[flwr.proto.message_pb2.Message]: ...
     def __init__(self,
         *,
-        task_res_list: typing.Optional[typing.Iterable[flwr.proto.task_pb2.TaskRes]] = ...,
+        node: typing.Optional[flwr.proto.node_pb2.Node] = ...,
+        messages_list: typing.Optional[typing.Iterable[flwr.proto.message_pb2.Message]] = ...,
         ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["task_res_list",b"task_res_list"]) -> None: ...
-global___PushTaskResRequest = PushTaskResRequest
+    def HasField(self, field_name: typing_extensions.Literal["node",b"node"]) -> builtins.bool: ...
+    def ClearField(self, field_name: typing_extensions.Literal["messages_list",b"messages_list","node",b"node"]) -> None: ...
+global___PushMessagesRequest = PushMessagesRequest
 
-class PushTaskResResponse(google.protobuf.message.Message):
+class PushMessagesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
     class ResultsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -162,49 +167,7 @@ class PushTaskResResponse(google.protobuf.message.Message):
         ) -> None: ...
     def HasField(self, field_name: typing_extensions.Literal["reconnect",b"reconnect"]) -> builtins.bool: ...
     def ClearField(self, field_name: typing_extensions.Literal["reconnect",b"reconnect","results",b"results"]) -> None: ...
-global___PushTaskResResponse = PushTaskResResponse
-
-class Run(google.protobuf.message.Message):
-    """GetRun messages"""
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    RUN_ID_FIELD_NUMBER: builtins.int
-    FAB_ID_FIELD_NUMBER: builtins.int
-    FAB_VERSION_FIELD_NUMBER: builtins.int
-    run_id: builtins.int
-    fab_id: typing.Text
-    fab_version: typing.Text
-    def __init__(self,
-        *,
-        run_id: builtins.int = ...,
-        fab_id: typing.Text = ...,
-        fab_version: typing.Text = ...,
-        ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["fab_id",b"fab_id","fab_version",b"fab_version","run_id",b"run_id"]) -> None: ...
-global___Run = Run
-
-class GetRunRequest(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    RUN_ID_FIELD_NUMBER: builtins.int
-    run_id: builtins.int
-    def __init__(self,
-        *,
-        run_id: builtins.int = ...,
-        ) -> None: ...
-    def ClearField(self, field_name: typing_extensions.Literal["run_id",b"run_id"]) -> None: ...
-global___GetRunRequest = GetRunRequest
-
-class GetRunResponse(google.protobuf.message.Message):
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-    RUN_FIELD_NUMBER: builtins.int
-    @property
-    def run(self) -> global___Run: ...
-    def __init__(self,
-        *,
-        run: typing.Optional[global___Run] = ...,
-        ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["run",b"run"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["run",b"run"]) -> None: ...
-global___GetRunResponse = GetRunResponse
+global___PushMessagesResponse = PushMessagesResponse
 
 class Reconnect(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

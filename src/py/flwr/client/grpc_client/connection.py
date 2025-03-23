@@ -16,28 +16,32 @@
 
 
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
-from logging import DEBUG
+from logging import DEBUG, ERROR
 from pathlib import Path
 from queue import Queue
-from typing import Callable, Iterator, Optional, Tuple, Union, cast
+from typing import Callable, Optional, Union, cast
 
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from flwr.common import (
     DEFAULT_TTL,
     GRPC_MAX_MESSAGE_LENGTH,
-    ConfigsRecord,
+    ConfigRecord,
     Message,
     Metadata,
-    RecordSet,
+    RecordDict,
+    now,
 )
-from flwr.common import recordset_compat as compat
+from flwr.common import recorddict_compat as compat
 from flwr.common import serde
 from flwr.common.constant import MessageType, MessageTypeLegacy
-from flwr.common.grpc import create_channel
+from flwr.common.grpc import create_channel, on_channel_state_change
 from flwr.common.logger import log
+from flwr.common.message import make_message
 from flwr.common.retry_invoker import RetryInvoker
+from flwr.common.typing import Fab, Run
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
     Reason,
@@ -45,35 +49,25 @@ from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
 )
 from flwr.proto.transport_pb2_grpc import FlowerServiceStub  # pylint: disable=E0611
 
-# The following flags can be uncommented for debugging. Other possible values:
-# https://github.com/grpc/grpc/blob/master/doc/environment_variables.md
-# import os
-# os.environ["GRPC_VERBOSITY"] = "debug"
-# os.environ["GRPC_TRACE"] = "tcp,http"
-
-
-def on_channel_state_change(channel_connectivity: str) -> None:
-    """Log channel connectivity."""
-    log(DEBUG, channel_connectivity)
-
 
 @contextmanager
-def grpc_connection(  # pylint: disable=R0913, R0915
+def grpc_connection(  # pylint: disable=R0913,R0915,too-many-positional-arguments
     server_address: str,
     insecure: bool,
     retry_invoker: RetryInvoker,  # pylint: disable=unused-argument
     max_message_length: int = GRPC_MAX_MESSAGE_LENGTH,
     root_certificates: Optional[Union[bytes, str]] = None,
     authentication_keys: Optional[  # pylint: disable=unused-argument
-        Tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey]
+        tuple[ec.EllipticCurvePrivateKey, ec.EllipticCurvePublicKey]
     ] = None,
 ) -> Iterator[
-    Tuple[
+    tuple[
         Callable[[], Optional[Message]],
         Callable[[Message], None],
+        Optional[Callable[[], Optional[int]]],
         Optional[Callable[[], None]],
-        Optional[Callable[[], None]],
-        Optional[Callable[[int], Tuple[str, str]]],
+        Optional[Callable[[int], Run]],
+        Optional[Callable[[str, int], Fab]],
     ]
 ]:
     """Establish a gRPC connection to a gRPC server.
@@ -101,6 +95,8 @@ def grpc_connection(  # pylint: disable=R0913, R0915
         The PEM-encoded root certificates as a byte string or a path string.
         If provided, a secure connection using the certificates will be
         established to an SSL-enabled Flower server.
+    authentication_keys : Optional[Tuple[PrivateKey, PublicKey]] (default: None)
+        Client authentication is not supported for this transport type.
 
     Returns
     -------
@@ -123,6 +119,8 @@ def grpc_connection(  # pylint: disable=R0913, R0915
     """
     if isinstance(root_certificates, str):
         root_certificates = Path(root_certificates).read_bytes()
+    if authentication_keys is not None:
+        log(ERROR, "Client authentication is not supported for this transport type.")
 
     channel = create_channel(
         server_address=server_address,
@@ -143,32 +141,32 @@ def grpc_connection(  # pylint: disable=R0913, R0915
         # Receive ServerMessage proto
         proto = next(server_message_iterator)
 
-        # ServerMessage proto --> *Ins --> RecordSet
+        # ServerMessage proto --> *Ins --> RecordDict
         field = proto.WhichOneof("msg")
         message_type = ""
         if field == "get_properties_ins":
-            recordset = compat.getpropertiesins_to_recordset(
+            recorddict = compat.getpropertiesins_to_recorddict(
                 serde.get_properties_ins_from_proto(proto.get_properties_ins)
             )
             message_type = MessageTypeLegacy.GET_PROPERTIES
         elif field == "get_parameters_ins":
-            recordset = compat.getparametersins_to_recordset(
+            recorddict = compat.getparametersins_to_recorddict(
                 serde.get_parameters_ins_from_proto(proto.get_parameters_ins)
             )
             message_type = MessageTypeLegacy.GET_PARAMETERS
         elif field == "fit_ins":
-            recordset = compat.fitins_to_recordset(
+            recorddict = compat.fitins_to_recorddict(
                 serde.fit_ins_from_proto(proto.fit_ins), False
             )
             message_type = MessageType.TRAIN
         elif field == "evaluate_ins":
-            recordset = compat.evaluateins_to_recordset(
+            recorddict = compat.evaluateins_to_recorddict(
                 serde.evaluate_ins_from_proto(proto.evaluate_ins), False
             )
             message_type = MessageType.EVALUATE
         elif field == "reconnect_ins":
-            recordset = RecordSet()
-            recordset.configs_records["config"] = ConfigsRecord(
+            recorddict = RecordDict()
+            recorddict.config_records["config"] = ConfigRecord(
                 {"seconds": proto.reconnect_ins.seconds}
             )
             message_type = "reconnect"
@@ -179,45 +177,46 @@ def grpc_connection(  # pylint: disable=R0913, R0915
             )
 
         # Construct Message
-        return Message(
+        return make_message(
             metadata=Metadata(
                 run_id=0,
                 message_id=str(uuid.uuid4()),
                 src_node_id=0,
                 dst_node_id=0,
-                reply_to_message="",
+                reply_to_message_id="",
                 group_id="",
+                created_at=now().timestamp(),
                 ttl=DEFAULT_TTL,
                 message_type=message_type,
             ),
-            content=recordset,
+            content=recorddict,
         )
 
     def send(message: Message) -> None:
-        # Retrieve RecordSet and message_type
-        recordset = message.content
+        # Retrieve RecordDict and message_type
+        recorddict = message.content
         message_type = message.metadata.message_type
 
-        # RecordSet --> *Res --> *Res proto -> ClientMessage proto
+        # RecordDict --> *Res --> *Res proto -> ClientMessage proto
         if message_type == MessageTypeLegacy.GET_PROPERTIES:
-            getpropres = compat.recordset_to_getpropertiesres(recordset)
+            getpropres = compat.recorddict_to_getpropertiesres(recorddict)
             msg_proto = ClientMessage(
                 get_properties_res=serde.get_properties_res_to_proto(getpropres)
             )
         elif message_type == MessageTypeLegacy.GET_PARAMETERS:
-            getparamres = compat.recordset_to_getparametersres(recordset, False)
+            getparamres = compat.recorddict_to_getparametersres(recorddict, False)
             msg_proto = ClientMessage(
                 get_parameters_res=serde.get_parameters_res_to_proto(getparamres)
             )
         elif message_type == MessageType.TRAIN:
-            fitres = compat.recordset_to_fitres(recordset, False)
+            fitres = compat.recorddict_to_fitres(recorddict, False)
             msg_proto = ClientMessage(fit_res=serde.fit_res_to_proto(fitres))
         elif message_type == MessageType.EVALUATE:
-            evalres = compat.recordset_to_evaluateres(recordset)
+            evalres = compat.recorddict_to_evaluateres(recorddict)
             msg_proto = ClientMessage(evaluate_res=serde.evaluate_res_to_proto(evalres))
         elif message_type == "reconnect":
             reason = cast(
-                Reason.ValueType, recordset.configs_records["config"]["reason"]
+                Reason.ValueType, recorddict.config_records["config"]["reason"]
             )
             msg_proto = ClientMessage(
                 disconnect_res=ClientMessage.DisconnectRes(reason=reason)
@@ -230,7 +229,7 @@ def grpc_connection(  # pylint: disable=R0913, R0915
 
     try:
         # Yield methods
-        yield (receive, send, None, None, None)
+        yield (receive, send, None, None, None, None)
     finally:
         # Make sure to have a final
         channel.close()

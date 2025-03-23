@@ -15,118 +15,90 @@
 """Validator tests."""
 
 
-import time
 import unittest
-from typing import List, Tuple
 
-from flwr.common import DEFAULT_TTL
-from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
-from flwr.proto.recordset_pb2 import RecordSet  # pylint: disable=E0611
-from flwr.proto.task_pb2 import Task, TaskIns, TaskRes  # pylint: disable=E0611
+from parameterized import parameterized
 
-from .validator import validate_task_ins_or_res
+from flwr.common import DEFAULT_TTL, Error, Message, Metadata, RecordDict, now
+from flwr.common.constant import SUPERLINK_NODE_ID
+from flwr.common.message import make_message
+
+from .validator import validate_message
+
+
+def create_message(  # pylint: disable=R0913, R0917
+    message_id: str = "",
+    src_node_id: int = SUPERLINK_NODE_ID,
+    dst_node_id: int = 456,
+    ttl: int = DEFAULT_TTL,
+    reply_to_message_id: str = "",
+    has_content: bool = True,
+    has_error: bool = False,
+    msg_type: str = "mock",
+) -> Message:
+    """Create a Message for testing.
+
+    By default, it creates a valid instruction message containing a RecordDict.
+    """
+    metadata = Metadata(
+        run_id=0,
+        message_id=message_id,
+        src_node_id=src_node_id,
+        dst_node_id=dst_node_id,
+        reply_to_message_id=reply_to_message_id,
+        group_id="",
+        created_at=now().timestamp(),
+        ttl=ttl,
+        message_type="train",  # Bypass message type validation
+    )
+    metadata.__dict__["_message_type"] = msg_type
+    ret = make_message(metadata=metadata, content=RecordDict())
+    if not has_content:
+        ret.__dict__["_content"] = None
+    if has_error:
+        ret.__dict__["_error"] = Error(0)
+    return ret
 
 
 class ValidatorTest(unittest.TestCase):
     """Test validation code in state."""
 
-    def test_task_ins(self) -> None:
-        """Test is_valid task_ins."""
-        # Prepare
-        # (consumer_node_id, anonymous)
-        valid_ins = [(0, True), (1, False)]
-        invalid_ins = [(0, False), (1, True)]
+    @parameterized.expand(  # type: ignore
+        [
+            # Valid messages
+            (create_message(), False, False),
+            (create_message(has_content=False, has_error=True), False, False),
+            # `message_id` is set
+            (create_message(message_id="123"), False, True),
+            # `ttl` is zero
+            (create_message(ttl=0), False, True),
+            # `src_node_id` is not set
+            (create_message(src_node_id=0), False, True),
+            # `dst_node_id` is not set
+            (create_message(dst_node_id=0), False, True),
+            # `dst_node_id` is SUPERLINK
+            (create_message(dst_node_id=SUPERLINK_NODE_ID), False, True),
+            # `message_type` is not set
+            (create_message(msg_type=""), False, True),
+            # Both `content` and `error` are not set
+            (create_message(has_content=False), False, True),
+            # Both `content` and `error` are set
+            (create_message(has_error=True), False, True),
+            # `reply_to_message_id` is set in a non-reply message
+            (create_message(reply_to_message_id="789"), False, True),
+            # `reply_to_message_id` is not set in reply message
+            (create_message(), True, True),
+            # `dst_node_id` is not SuperLink in reply message
+            (create_message(src_node_id=123, reply_to_message_id="blabla"), True, True),
+        ]
+    )
+    def test_message(self, message: Message, is_reply: bool, should_fail: bool) -> None:
+        """Test is_valid message."""
+        # Execute
+        val_errors = validate_message(message, is_reply_message=is_reply)
 
-        # Execute & Assert
-        for consumer_node_id, anonymous in valid_ins:
-            msg = create_task_ins(consumer_node_id, anonymous)
-            val_errors = validate_task_ins_or_res(msg)
-            self.assertFalse(val_errors)
-
-        for consumer_node_id, anonymous in invalid_ins:
-            msg = create_task_ins(consumer_node_id, anonymous)
-            val_errors = validate_task_ins_or_res(msg)
+        # Assert
+        if should_fail:
             self.assertTrue(val_errors)
-
-    def test_is_valid_task_res(self) -> None:
-        """Test is_valid task_res."""
-        # Prepare
-        # (producer_node_id, anonymous, ancestry)
-        valid_res: List[Tuple[int, bool, List[str]]] = [
-            (0, True, ["1"]),
-            (1, False, ["1"]),
-        ]
-
-        invalid_res: List[Tuple[int, bool, List[str]]] = [
-            (0, False, []),
-            (0, False, ["1"]),
-            (0, True, []),
-            (1, False, []),
-            (1, True, []),
-            (1, True, ["1"]),
-        ]
-
-        # Execute & Assert
-        for producer_node_id, anonymous, ancestry in valid_res:
-            msg = create_task_res(producer_node_id, anonymous, ancestry)
-            val_errors = validate_task_ins_or_res(msg)
+        else:
             self.assertFalse(val_errors)
-
-        for producer_node_id, anonymous, ancestry in invalid_res:
-            msg = create_task_res(producer_node_id, anonymous, ancestry)
-            val_errors = validate_task_ins_or_res(msg)
-            self.assertTrue(val_errors, (producer_node_id, anonymous, ancestry))
-
-
-def create_task_ins(
-    consumer_node_id: int,
-    anonymous: bool,
-    delivered_at: str = "",
-) -> TaskIns:
-    """Create a TaskIns for testing."""
-    consumer = Node(
-        node_id=consumer_node_id,
-        anonymous=anonymous,
-    )
-    task = TaskIns(
-        task_id="",
-        group_id="",
-        run_id=0,
-        task=Task(
-            delivered_at=delivered_at,
-            producer=Node(node_id=0, anonymous=True),
-            consumer=consumer,
-            task_type="mock",
-            recordset=RecordSet(parameters={}, metrics={}, configs={}),
-            ttl=DEFAULT_TTL,
-            created_at=time.time(),
-        ),
-    )
-
-    task.task.pushed_at = time.time()
-    return task
-
-
-def create_task_res(
-    producer_node_id: int,
-    anonymous: bool,
-    ancestry: List[str],
-) -> TaskRes:
-    """Create a TaskRes for testing."""
-    task_res = TaskRes(
-        task_id="",
-        group_id="",
-        run_id=0,
-        task=Task(
-            producer=Node(node_id=producer_node_id, anonymous=anonymous),
-            consumer=Node(node_id=0, anonymous=True),
-            ancestry=ancestry,
-            task_type="mock",
-            recordset=RecordSet(parameters={}, metrics={}, configs={}),
-            ttl=DEFAULT_TTL,
-            created_at=time.time(),
-        ),
-    )
-
-    task_res.task.pushed_at = time.time()
-    return task_res

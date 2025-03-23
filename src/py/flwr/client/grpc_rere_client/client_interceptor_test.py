@@ -1,4 +1,4 @@
-# Copyright 2020 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2024 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,41 +15,41 @@
 """Flower client interceptor tests."""
 
 
-import base64
 import threading
 import unittest
+from collections.abc import Sequence
 from concurrent import futures
 from logging import DEBUG, INFO, WARN
-from typing import Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Union
 
 import grpc
+from google.protobuf.message import Message as GrpcMessage
+from parameterized import parameterized
 
 from flwr.client.grpc_rere_client.connection import grpc_request_response
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH
+from flwr.common.constant import PUBLIC_KEY_HEADER, SIGNATURE_HEADER, TIMESTAMP_HEADER
 from flwr.common.logger import log
-from flwr.common.message import Message, Metadata
-from flwr.common.record import RecordSet
+from flwr.common.message import Message
+from flwr.common.record import RecordDict
 from flwr.common.retry_invoker import RetryInvoker, exponential
 from flwr.common.secure_aggregation.crypto.symmetric_encryption import (
-    compute_hmac,
     generate_key_pairs,
-    generate_shared_key,
     public_key_to_bytes,
+    verify_signature,
 )
 from flwr.proto.fleet_pb2 import (  # pylint: disable=E0611
     CreateNodeRequest,
     CreateNodeResponse,
     DeleteNodeRequest,
     DeleteNodeResponse,
-    GetRunRequest,
-    GetRunResponse,
-    PullTaskInsRequest,
-    PullTaskInsResponse,
-    PushTaskResRequest,
-    PushTaskResResponse,
+    PullMessagesRequest,
+    PullMessagesResponse,
+    PushMessagesRequest,
+    PushMessagesResponse,
 )
-
-from .client_interceptor import _AUTH_TOKEN_HEADER, _PUBLIC_KEY_HEADER, Request
+from flwr.proto.node_pb2 import Node  # pylint: disable=E0611
+from flwr.proto.run_pb2 import GetRunRequest, GetRunResponse  # pylint: disable=E0611
 
 
 class _MockServicer:
@@ -59,36 +59,31 @@ class _MockServicer:
         """Initialize mock servicer."""
         self._lock = threading.Lock()
         self._received_client_metadata: Optional[
-            Sequence[Tuple[str, Union[str, bytes]]]
+            Sequence[tuple[str, Union[str, bytes]]]
         ] = None
-        self.server_private_key, self.server_public_key = generate_key_pairs()
         self._received_message_bytes: bytes = b""
 
-    def unary_unary(
-        self, request: Request, context: grpc.ServicerContext
-    ) -> Union[
-        CreateNodeResponse, DeleteNodeResponse, PushTaskResResponse, PullTaskInsResponse
-    ]:
+    def unary_unary(  # pylint: disable=too-many-return-statements
+        self, request: GrpcMessage, context: grpc.ServicerContext
+    ) -> GrpcMessage:
         """Handle unary call."""
         with self._lock:
             self._received_client_metadata = context.invocation_metadata()
-            self._received_message_bytes = request.SerializeToString(True)
+            self._received_message_bytes = request.SerializeToString(deterministic=True)
 
             if isinstance(request, CreateNodeRequest):
-                context.send_initial_metadata(
-                    ((_PUBLIC_KEY_HEADER, self.server_public_key),)
-                )
-                return CreateNodeResponse()
+                return CreateNodeResponse(node=Node(node_id=123))
             if isinstance(request, DeleteNodeRequest):
                 return DeleteNodeResponse()
-            if isinstance(request, PushTaskResRequest):
-                return PushTaskResResponse()
-
-            return PullTaskInsResponse()
+            if isinstance(request, PushMessagesRequest):
+                return PushMessagesResponse()
+            if isinstance(request, GetRunRequest):
+                return GetRunResponse()
+            return PullMessagesResponse(messages_list=[])
 
     def received_client_metadata(
         self,
-    ) -> Optional[Sequence[Tuple[str, Union[str, bytes]]]]:
+    ) -> Optional[Sequence[tuple[str, Union[str, bytes]]]]:
         """Return received client metadata."""
         with self._lock:
             return self._received_client_metadata
@@ -111,15 +106,15 @@ def _add_generic_handler(servicer: _MockServicer, server: grpc.Server) -> None:
             request_deserializer=DeleteNodeRequest.FromString,
             response_serializer=DeleteNodeResponse.SerializeToString,
         ),
-        "PullTaskIns": grpc.unary_unary_rpc_method_handler(
+        "PullMessages": grpc.unary_unary_rpc_method_handler(
             servicer.unary_unary,
-            request_deserializer=PullTaskInsRequest.FromString,
-            response_serializer=PullTaskInsResponse.SerializeToString,
+            request_deserializer=PullMessagesRequest.FromString,
+            response_serializer=PullMessagesResponse.SerializeToString,
         ),
-        "PushTaskRes": grpc.unary_unary_rpc_method_handler(
+        "PushMessages": grpc.unary_unary_rpc_method_handler(
             servicer.unary_unary,
-            request_deserializer=PushTaskResRequest.FromString,
-            response_serializer=PushTaskResResponse.SerializeToString,
+            request_deserializer=PushMessagesRequest.FromString,
+            response_serializer=PushMessagesResponse.SerializeToString,
         ),
         "GetRun": grpc.unary_unary_rpc_method_handler(
             servicer.unary_unary,
@@ -137,7 +132,7 @@ def _init_retry_invoker() -> RetryInvoker:
     return RetryInvoker(
         wait_gen_factory=exponential,
         recoverable_exceptions=grpc.RpcError,
-        max_tries=None,
+        max_tries=1,
         max_time=None,
         on_giveup=lambda retry_state: (
             log(
@@ -171,6 +166,36 @@ def _init_retry_invoker() -> RetryInvoker:
     )
 
 
+def _create_node(conn: Any) -> None:
+    create_node = conn[2]
+    create_node()
+
+
+def _delete_node(conn: Any) -> None:
+    _, _, create_node, delete_node, _, _ = conn
+    create_node()
+    delete_node()
+
+
+def _receive(conn: Any) -> None:
+    receive, _, create_node, _, _, _ = conn
+    create_node()
+    receive()
+
+
+def _send(conn: Any) -> None:
+    receive, send, create_node, _, _, _ = conn
+    create_node()
+    receive()
+    send(Message(RecordDict(), dst_node_id=0, message_type="query"))
+
+
+def _get_run(conn: Any) -> None:
+    _, _, create_node, _, get_run, _ = conn
+    create_node()
+    get_run(0)
+
+
 class TestAuthenticateClientInterceptor(unittest.TestCase):
     """Test for client interceptor client authentication."""
 
@@ -189,7 +214,10 @@ class TestAuthenticateClientInterceptor(unittest.TestCase):
         self._connection = grpc_request_response
         self._address = f"localhost:{port}"
 
-    def test_client_auth_create_node(self) -> None:
+    @parameterized.expand(
+        [(_create_node,), (_delete_node,), (_receive,), (_send,), (_get_run,)]
+    )  # type: ignore
+    def test_client_auth_rpc(self, grpc_call: Callable[[Any], None]) -> None:
         """Test client authentication during create node."""
         # Prepare
         retry_invoker = _init_retry_invoker()
@@ -203,173 +231,46 @@ class TestAuthenticateClientInterceptor(unittest.TestCase):
             None,
             (self._client_private_key, self._client_public_key),
         ) as conn:
-            _, _, create_node, _, _ = conn
+            grpc_call(conn)
+
+            received_metadata = self._servicer.received_client_metadata()
+            assert received_metadata is not None
+
+            metadata_dict = dict(received_metadata)
+            actual_public_key = metadata_dict[PUBLIC_KEY_HEADER]
+            signature = metadata_dict[SIGNATURE_HEADER]
+            timestamp = metadata_dict[TIMESTAMP_HEADER]
+
+            expected_public_key = public_key_to_bytes(self._client_public_key)
+
+            # Assert
+            assert isinstance(signature, bytes)
+            assert isinstance(timestamp, str)
+            assert actual_public_key == expected_public_key
+            assert verify_signature(
+                self._client_public_key, timestamp.encode("ascii"), signature
+            )
+
+    def test_without_servicer(self) -> None:
+        """Test client authentication without servicer."""
+        # Prepare
+        self._server.stop(grace=None)
+        retry_invoker = _init_retry_invoker()
+
+        # Execute and Assert
+        with self._connection(
+            self._address,
+            True,
+            retry_invoker,
+            GRPC_MAX_MESSAGE_LENGTH,
+            None,
+            (self._client_private_key, self._client_public_key),
+        ) as conn:
+            _, _, create_node, _, _, _ = conn
             assert create_node is not None
             create_node()
-            expected_client_metadata = (
-                _PUBLIC_KEY_HEADER,
-                base64.urlsafe_b64encode(public_key_to_bytes(self._client_public_key)),
-            )
 
-            # Assert
-            assert self._servicer.received_client_metadata() == expected_client_metadata
-
-    def test_client_auth_delete_node(self) -> None:
-        """Test client authentication during delete node."""
-        # Prepare
-        retry_invoker = _init_retry_invoker()
-
-        # Execute
-        with self._connection(
-            self._address,
-            True,
-            retry_invoker,
-            GRPC_MAX_MESSAGE_LENGTH,
-            None,
-            (self._client_private_key, self._client_public_key),
-        ) as conn:
-            _, _, _, delete_node, _ = conn
-            assert delete_node is not None
-            delete_node()
-            shared_secret = generate_shared_key(
-                self._servicer.server_private_key, self._client_public_key
-            )
-            expected_hmac = compute_hmac(
-                shared_secret, self._servicer.received_message_bytes()
-            )
-            expected_client_metadata = (
-                (
-                    _PUBLIC_KEY_HEADER,
-                    base64.urlsafe_b64encode(
-                        public_key_to_bytes(self._client_public_key)
-                    ),
-                ),
-                (
-                    _AUTH_TOKEN_HEADER,
-                    base64.urlsafe_b64encode(expected_hmac),
-                ),
-            )
-
-            # Assert
-            assert self._servicer.received_client_metadata() == expected_client_metadata
-
-    def test_client_auth_receive(self) -> None:
-        """Test client authentication during receive node."""
-        # Prepare
-        retry_invoker = _init_retry_invoker()
-
-        # Execute
-        with self._connection(
-            self._address,
-            True,
-            retry_invoker,
-            GRPC_MAX_MESSAGE_LENGTH,
-            None,
-            (self._client_private_key, self._client_public_key),
-        ) as conn:
-            receive, _, _, _, _ = conn
-            assert receive is not None
-            receive()
-            shared_secret = generate_shared_key(
-                self._servicer.server_private_key, self._client_public_key
-            )
-            expected_hmac = compute_hmac(
-                shared_secret, self._servicer.received_message_bytes()
-            )
-            expected_client_metadata = (
-                (
-                    _PUBLIC_KEY_HEADER,
-                    base64.urlsafe_b64encode(
-                        public_key_to_bytes(self._client_public_key)
-                    ),
-                ),
-                (
-                    _AUTH_TOKEN_HEADER,
-                    base64.urlsafe_b64encode(expected_hmac),
-                ),
-            )
-
-            # Assert
-            assert self._servicer.received_client_metadata() == expected_client_metadata
-
-    def test_client_auth_send(self) -> None:
-        """Test client authentication during send node."""
-        # Prepare
-        retry_invoker = _init_retry_invoker()
-        message = Message(Metadata(0, "1", 0, 0, "", "", 0, ""), RecordSet())
-
-        # Execute
-        with self._connection(
-            self._address,
-            True,
-            retry_invoker,
-            GRPC_MAX_MESSAGE_LENGTH,
-            None,
-            (self._client_private_key, self._client_public_key),
-        ) as conn:
-            _, send, _, _, _ = conn
-            assert send is not None
-            send(message)
-            shared_secret = generate_shared_key(
-                self._servicer.server_private_key, self._client_public_key
-            )
-            expected_hmac = compute_hmac(
-                shared_secret, self._servicer.received_message_bytes()
-            )
-            expected_client_metadata = (
-                (
-                    _PUBLIC_KEY_HEADER,
-                    base64.urlsafe_b64encode(
-                        public_key_to_bytes(self._client_public_key)
-                    ),
-                ),
-                (
-                    _AUTH_TOKEN_HEADER,
-                    base64.urlsafe_b64encode(expected_hmac),
-                ),
-            )
-
-            # Assert
-            assert self._servicer.received_client_metadata() == expected_client_metadata
-
-    def test_client_auth_get_run(self) -> None:
-        """Test client authentication during send node."""
-        # Prepare
-        retry_invoker = _init_retry_invoker()
-
-        # Execute
-        with self._connection(
-            self._address,
-            True,
-            retry_invoker,
-            GRPC_MAX_MESSAGE_LENGTH,
-            None,
-            (self._client_private_key, self._client_public_key),
-        ) as conn:
-            _, _, _, _, get_run = conn
-            assert get_run is not None
-            get_run(0)
-            shared_secret = generate_shared_key(
-                self._servicer.server_private_key, self._client_public_key
-            )
-            expected_hmac = compute_hmac(
-                shared_secret, self._servicer.received_message_bytes()
-            )
-            expected_client_metadata = (
-                (
-                    _PUBLIC_KEY_HEADER,
-                    base64.urlsafe_b64encode(
-                        public_key_to_bytes(self._client_public_key)
-                    ),
-                ),
-                (
-                    _AUTH_TOKEN_HEADER,
-                    base64.urlsafe_b64encode(expected_hmac),
-                ),
-            )
-
-            # Assert
-            assert self._servicer.received_client_metadata() == expected_client_metadata
+            assert self._servicer.received_client_metadata() is None
 
 
 if __name__ == "__main__":

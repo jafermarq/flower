@@ -14,6 +14,7 @@
 # ==============================================================================
 """Mods that report statistics about message communication."""
 
+
 from logging import INFO
 
 import numpy as np
@@ -29,51 +30,45 @@ def message_size_mod(
 ) -> Message:
     """Message size mod.
 
-    This mod logs the size in Bytes of the message being transmited.
+    This mod logs the size in bytes of the message being transmited.
     """
     message_size_in_bytes = 0
 
-    for p_record in msg.content.parameters_records.values():
-        message_size_in_bytes += p_record.count_bytes()
+    for record in msg.content.values():
+        message_size_in_bytes += record.count_bytes()
 
-    for c_record in msg.content.configs_records.values():
-        message_size_in_bytes += c_record.count_bytes()
-
-    for m_record in msg.content.metrics_records.values():
-        message_size_in_bytes += m_record.count_bytes()
-
-    log(INFO, "Message size: %i Bytes", message_size_in_bytes)
+    log(INFO, "Message size: %i bytes", message_size_in_bytes)
 
     return call_next(msg, ctxt)
 
 
-def parameters_size_mod(
+def arrays_size_mod(
     msg: Message, ctxt: Context, call_next: ClientAppCallable
 ) -> Message:
-    """Parameters size mod.
+    """Arrays size mod.
 
-    This mod logs the number of parameters transmitted in the message as well as their
-    size in Bytes.
+    This mod logs the number of array elements transmitted in ``ArrayRecord``s of
+    the message as well as their sizes in bytes.
     """
     model_size_stats = {}
-    parameters_size_in_bytes = 0
-    for record_name, p_record in msg.content.parameters_records.items():
-        p_record_bytes = p_record.count_bytes()
-        parameters_size_in_bytes += p_record_bytes
-        parameter_count = 0
-        for array in p_record.values():
-            parameter_count += (
+    arrays_size_in_bytes = 0
+    for record_name, arr_record in msg.content.array_records.items():
+        arr_record_bytes = arr_record.count_bytes()
+        arrays_size_in_bytes += arr_record_bytes
+        element_count = 0
+        for array in arr_record.values():
+            element_count += (
                 int(np.prod(array.shape)) if array.shape else array.numpy().size
             )
 
         model_size_stats[f"{record_name}"] = {
-            "parameters": parameter_count,
-            "bytes": p_record_bytes,
+            "elements": element_count,
+            "bytes": arr_record_bytes,
         }
 
     if model_size_stats:
         log(INFO, model_size_stats)
 
-    log(INFO, "Total parameters transmited: %i Bytes", parameters_size_in_bytes)
+    log(INFO, "Total array elements transmitted: %i bytes", arrays_size_in_bytes)
 
     return call_next(msg, ctxt)

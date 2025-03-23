@@ -14,65 +14,131 @@
 # ==============================================================================
 """Flower server app."""
 
+
 import argparse
-import asyncio
+import csv
 import importlib.util
+import multiprocessing
+import multiprocessing.context
+import os
 import sys
 import threading
-from logging import ERROR, INFO, WARN
-from os.path import isfile
+from collections.abc import Sequence
+from logging import DEBUG, INFO, WARN
 from pathlib import Path
-from typing import List, Optional, Tuple
+from time import sleep
+from typing import Any, Optional
 
 import grpc
+import yaml
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import load_ssh_public_key
 
 from flwr.common import GRPC_MAX_MESSAGE_LENGTH, EventType, event
 from flwr.common.address import parse_address
+from flwr.common.args import try_obtain_server_certificates
+from flwr.common.auth_plugin import ExecAuthPlugin
+from flwr.common.config import get_flwr_dir, parse_config_args
 from flwr.common.constant import (
-    MISSING_EXTRA_REST,
+    AUTH_TYPE_YAML_KEY,
+    CLIENT_OCTET,
+    EXEC_API_DEFAULT_SERVER_ADDRESS,
+    FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS,
+    FLEET_API_GRPC_RERE_DEFAULT_ADDRESS,
+    FLEET_API_REST_DEFAULT_ADDRESS,
+    ISOLATION_MODE_PROCESS,
+    ISOLATION_MODE_SUBPROCESS,
+    SERVER_OCTET,
+    SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+    SIMULATIONIO_API_DEFAULT_SERVER_ADDRESS,
+    TRANSPORT_TYPE_GRPC_ADAPTER,
     TRANSPORT_TYPE_GRPC_RERE,
     TRANSPORT_TYPE_REST,
-    TRANSPORT_TYPE_VCE,
+    EventLogWriterType,
 )
+from flwr.common.event_log_plugin import EventLogWriterPlugin
+from flwr.common.exit import ExitCode, flwr_exit
 from flwr.common.exit_handlers import register_exit_handlers
-from flwr.common.logger import log
+from flwr.common.grpc import generic_create_grpc_server
+from flwr.common.logger import log, warn_deprecated_feature
+from flwr.common.secure_aggregation.crypto.symmetric_encryption import (
+    public_key_to_bytes,
+)
 from flwr.proto.fleet_pb2_grpc import (  # pylint: disable=E0611
     add_FleetServicer_to_server,
 )
+from flwr.proto.grpcadapter_pb2_grpc import add_GrpcAdapterServicer_to_server
+from flwr.server.fleet_event_log_interceptor import FleetEventLogInterceptor
+from flwr.server.serverapp.app import flwr_serverapp
+from flwr.simulation.app import flwr_simulation
+from flwr.superexec.app import load_executor
+from flwr.superexec.exec_grpc import run_exec_api_grpc
 
 from .client_manager import ClientManager
 from .history import History
 from .server import Server, init_defaults, run_fl
 from .server_config import ServerConfig
 from .strategy import Strategy
-from .superlink.driver.driver_grpc import run_driver_api_grpc
-from .superlink.fleet.grpc_bidi.grpc_server import (
-    generic_create_grpc_server,
-    start_grpc_server,
-)
+from .superlink.ffs.ffs_factory import FfsFactory
+from .superlink.fleet.grpc_adapter.grpc_adapter_servicer import GrpcAdapterServicer
+from .superlink.fleet.grpc_bidi.grpc_server import start_grpc_server
 from .superlink.fleet.grpc_rere.fleet_servicer import FleetServicer
-from .superlink.fleet.vce import start_vce
-from .superlink.state import StateFactory
-
-ADDRESS_DRIVER_API = "0.0.0.0:9091"
-ADDRESS_FLEET_API_GRPC_RERE = "0.0.0.0:9092"
-ADDRESS_FLEET_API_GRPC_BIDI = "[::]:8080"  # IPv6 to keep start_server compatible
-ADDRESS_FLEET_API_REST = "0.0.0.0:9093"
+from .superlink.fleet.grpc_rere.server_interceptor import AuthenticateServerInterceptor
+from .superlink.linkstate import LinkStateFactory
+from .superlink.serverappio.serverappio_grpc import run_serverappio_api_grpc
+from .superlink.simulation.simulationio_grpc import run_simulationio_api_grpc
 
 DATABASE = ":flwr-in-memory-state:"
+BASE_DIR = get_flwr_dir() / "superlink" / "ffs"
+
+
+try:
+    from flwr.ee import (
+        add_ee_args_superlink,
+        get_dashboard_server,
+        get_exec_auth_plugins,
+        get_exec_event_log_writer_plugins,
+        get_fleet_event_log_writer_plugins,
+    )
+except ImportError:
+
+    # pylint: disable-next=unused-argument
+    def add_ee_args_superlink(parser: argparse.ArgumentParser) -> None:
+        """Add EE-specific arguments to the parser."""
+
+    def get_exec_auth_plugins() -> dict[str, type[ExecAuthPlugin]]:
+        """Return all Exec API authentication plugins."""
+        raise NotImplementedError("No authentication plugins are currently supported.")
+
+    def get_exec_event_log_writer_plugins() -> dict[str, type[EventLogWriterPlugin]]:
+        """Return all Exec API event log writer plugins."""
+        raise NotImplementedError(
+            "No event log writer plugins are currently supported."
+        )
+
+    def get_fleet_event_log_writer_plugins() -> dict[str, type[EventLogWriterPlugin]]:
+        """Return all Fleet API event log writer plugins."""
+        raise NotImplementedError(
+            "No event log writer plugins are currently supported."
+        )
 
 
 def start_server(  # pylint: disable=too-many-arguments,too-many-locals
     *,
-    server_address: str = ADDRESS_FLEET_API_GRPC_BIDI,
+    server_address: str = FLEET_API_GRPC_BIDI_DEFAULT_ADDRESS,
     server: Optional[Server] = None,
     config: Optional[ServerConfig] = None,
     strategy: Optional[Strategy] = None,
     client_manager: Optional[ClientManager] = None,
     grpc_max_message_length: int = GRPC_MAX_MESSAGE_LENGTH,
-    certificates: Optional[Tuple[bytes, bytes, bytes]] = None,
+    certificates: Optional[tuple[bytes, bytes, bytes]] = None,
 ) -> History:
     """Start a Flower server using the gRPC transport layer.
+
+    Warning
+    -------
+    This function is deprecated since 1.13.0. Use the :code:`flower-superlink` command
+    instead to start a SuperLink.
 
     Parameters
     ----------
@@ -131,6 +197,17 @@ def start_server(  # pylint: disable=too-many-arguments,too-many-locals
     >>>     )
     >>> )
     """
+    msg = (
+        "flwr.server.start_server() is deprecated."
+        "\n\tInstead, use the `flower-superlink` CLI command to start a SuperLink "
+        "as shown below:"
+        "\n\n\t\t$ flower-superlink --insecure"
+        "\n\n\tTo view usage and all available options, run:"
+        "\n\n\t\t$ flower-superlink --help"
+        "\n\n\tUsing `start_server()` is deprecated."
+    )
+    warn_deprecated_feature(name=msg)
+
     event(EventType.START_SERVER_ENTER)
 
     # Parse IP address
@@ -167,6 +244,13 @@ def start_server(  # pylint: disable=too-many-arguments,too-many-locals
         "enabled" if certificates is not None else "disabled",
     )
 
+    # Graceful shutdown
+    register_exit_handlers(
+        event_type=EventType.START_SERVER_LEAVE,
+        exit_message="Flower server terminated gracefully.",
+        grpc_servers=[grpc_server],
+    )
+
     # Start training
     hist = run_fl(
         server=initialized_server,
@@ -181,247 +265,421 @@ def start_server(  # pylint: disable=too-many-arguments,too-many-locals
     return hist
 
 
-def run_driver_api() -> None:
-    """Run Flower server (Driver API)."""
-    log(INFO, "Starting Flower server (Driver API)")
-    event(EventType.RUN_DRIVER_API_ENTER)
-    args = _parse_args_run_driver_api().parse_args()
-
-    # Parse IP address
-    parsed_address = parse_address(args.driver_api_address)
-    if not parsed_address:
-        sys.exit(f"Driver IP address ({args.driver_api_address}) cannot be parsed.")
-    host, port, is_v6 = parsed_address
-    address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
-
-    # Obtain certificates
-    certificates = _try_obtain_certificates(args)
-
-    # Initialize StateFactory
-    state_factory = StateFactory(args.database)
-
-    # Start server
-    grpc_server: grpc.Server = run_driver_api_grpc(
-        address=address,
-        state_factory=state_factory,
-        certificates=certificates,
-    )
-
-    # Graceful shutdown
-    register_exit_handlers(
-        event_type=EventType.RUN_DRIVER_API_LEAVE,
-        grpc_servers=[grpc_server],
-        bckg_threads=[],
-    )
-
-    # Block
-    grpc_server.wait_for_termination()
-
-
-def run_fleet_api() -> None:
-    """Run Flower server (Fleet API)."""
-    log(INFO, "Starting Flower server (Fleet API)")
-    event(EventType.RUN_FLEET_API_ENTER)
-    args = _parse_args_run_fleet_api().parse_args()
-
-    # Obtain certificates
-    certificates = _try_obtain_certificates(args)
-
-    # Initialize StateFactory
-    state_factory = StateFactory(args.database)
-
-    grpc_servers = []
-    bckg_threads = []
-
-    # Start Fleet API
-    if args.fleet_api_type == TRANSPORT_TYPE_REST:
-        if (
-            importlib.util.find_spec("requests")
-            and importlib.util.find_spec("starlette")
-            and importlib.util.find_spec("uvicorn")
-        ) is None:
-            sys.exit(MISSING_EXTRA_REST)
-        address_arg = args.rest_fleet_api_address
-        parsed_address = parse_address(address_arg)
-        if not parsed_address:
-            sys.exit(f"Fleet IP address ({address_arg}) cannot be parsed.")
-        host, port, _ = parsed_address
-        fleet_thread = threading.Thread(
-            target=_run_fleet_api_rest,
-            args=(
-                host,
-                port,
-                args.ssl_keyfile,
-                args.ssl_certfile,
-                state_factory,
-                args.rest_fleet_api_workers,
-            ),
-        )
-        fleet_thread.start()
-        bckg_threads.append(fleet_thread)
-    elif args.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
-        address_arg = args.grpc_rere_fleet_api_address
-        parsed_address = parse_address(address_arg)
-        if not parsed_address:
-            sys.exit(f"Fleet IP address ({address_arg}) cannot be parsed.")
-        host, port, is_v6 = parsed_address
-        address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
-        fleet_server = _run_fleet_api_grpc_rere(
-            address=address,
-            state_factory=state_factory,
-            certificates=certificates,
-        )
-        grpc_servers.append(fleet_server)
-    else:
-        raise ValueError(f"Unknown fleet_api_type: {args.fleet_api_type}")
-
-    # Graceful shutdown
-    register_exit_handlers(
-        event_type=EventType.RUN_FLEET_API_LEAVE,
-        grpc_servers=grpc_servers,
-        bckg_threads=bckg_threads,
-    )
-
-    # Block
-    if len(grpc_servers) > 0:
-        grpc_servers[0].wait_for_termination()
-    elif len(bckg_threads) > 0:
-        bckg_threads[0].join()
-
-
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 def run_superlink() -> None:
-    """Run Flower SuperLink (Driver API and Fleet API)."""
+    """Run Flower SuperLink (ServerAppIo API and Fleet API)."""
+    args = _parse_args_run_superlink().parse_args()
+
     log(INFO, "Starting Flower SuperLink")
 
     event(EventType.RUN_SUPERLINK_ENTER)
 
-    args = _parse_args_run_superlink().parse_args()
+    # Warn unused options
+    if args.flwr_dir is not None:
+        log(
+            WARN, "The `--flwr-dir` option is currently not in use and will be ignored."
+        )
 
-    # Parse IP address
-    parsed_address = parse_address(args.driver_api_address)
-    if not parsed_address:
-        sys.exit(f"Driver IP address ({args.driver_api_address}) cannot be parsed.")
-    host, port, is_v6 = parsed_address
-    address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
+    # Parse IP addresses
+    serverappio_address, _, _ = _format_address(args.serverappio_api_address)
+    exec_address, _, _ = _format_address(args.exec_api_address)
+    simulationio_address, _, _ = _format_address(args.simulationio_api_address)
 
     # Obtain certificates
-    certificates = _try_obtain_certificates(args)
+    certificates = try_obtain_server_certificates(args)
+
+    # Disable the user auth TLS check if args.disable_oidc_tls_cert_verification is
+    # provided
+    verify_tls_cert = not getattr(args, "disable_oidc_tls_cert_verification", None)
+
+    auth_plugin: Optional[ExecAuthPlugin] = None
+    event_log_plugin: Optional[EventLogWriterPlugin] = None
+    # Load the auth plugin if the args.user_auth_config is provided
+    if cfg_path := getattr(args, "user_auth_config", None):
+        auth_plugin = _try_obtain_exec_auth_plugin(Path(cfg_path), verify_tls_cert)
+        # Enable event logging if the args.enable_event_log is True
+        if args.enable_event_log:
+            event_log_plugin = _try_obtain_exec_event_log_writer_plugin()
 
     # Initialize StateFactory
-    state_factory = StateFactory(args.database)
+    state_factory = LinkStateFactory(args.database)
 
-    # Start Driver API
-    driver_server: grpc.Server = run_driver_api_grpc(
-        address=address,
+    # Initialize FfsFactory
+    ffs_factory = FfsFactory(args.storage_dir)
+
+    # Start Exec API
+    executor = load_executor(args)
+    exec_server: grpc.Server = run_exec_api_grpc(
+        address=exec_address,
         state_factory=state_factory,
+        ffs_factory=ffs_factory,
+        executor=executor,
         certificates=certificates,
+        config=parse_config_args(
+            [args.executor_config] if args.executor_config else args.executor_config
+        ),
+        auth_plugin=auth_plugin,
+        event_log_plugin=event_log_plugin,
     )
+    grpc_servers = [exec_server]
 
-    grpc_servers = [driver_server]
-    bckg_threads = []
+    # Determine Exec plugin
+    # If simulation is used, don't start ServerAppIo and Fleet APIs
+    sim_exec = executor.__class__.__qualname__ == "SimulationEngine"
+    bckg_threads: list[threading.Thread] = []
 
-    # Start Fleet API
-    if args.fleet_api_type == TRANSPORT_TYPE_REST:
-        if (
-            importlib.util.find_spec("requests")
-            and importlib.util.find_spec("starlette")
-            and importlib.util.find_spec("uvicorn")
-        ) is None:
-            sys.exit(MISSING_EXTRA_REST)
-        address_arg = args.rest_fleet_api_address
-        parsed_address = parse_address(address_arg)
-        if not parsed_address:
-            sys.exit(f"Fleet IP address ({address_arg}) cannot be parsed.")
-        host, port, _ = parsed_address
-        fleet_thread = threading.Thread(
-            target=_run_fleet_api_rest,
-            args=(
-                host,
-                port,
-                args.ssl_keyfile,
-                args.ssl_certfile,
-                state_factory,
-                args.rest_fleet_api_workers,
-            ),
-        )
-        fleet_thread.start()
-        bckg_threads.append(fleet_thread)
-    elif args.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
-        address_arg = args.grpc_rere_fleet_api_address
-        parsed_address = parse_address(address_arg)
-        if not parsed_address:
-            sys.exit(f"Fleet IP address ({address_arg}) cannot be parsed.")
-        host, port, is_v6 = parsed_address
-        address = f"[{host}]:{port}" if is_v6 else f"{host}:{port}"
-        fleet_server = _run_fleet_api_grpc_rere(
-            address=address,
+    if sim_exec:
+        simulationio_server: grpc.Server = run_simulationio_api_grpc(
+            address=simulationio_address,
             state_factory=state_factory,
-            certificates=certificates,
+            ffs_factory=ffs_factory,
+            certificates=None,  # SimulationAppIo API doesn't support SSL yet
         )
-        grpc_servers.append(fleet_server)
-    elif args.fleet_api_type == TRANSPORT_TYPE_VCE:
-        f_stop = asyncio.Event()  # Does nothing
-        _run_fleet_api_vce(
-            num_supernodes=args.num_supernodes,
-            client_app_attr=args.client_app,
-            backend_name=args.backend,
-            backend_config_json_stream=args.backend_config,
-            app_dir=args.app_dir,
-            state_factory=state_factory,
-            f_stop=f_stop,
-        )
+        grpc_servers.append(simulationio_server)
+
     else:
-        raise ValueError(f"Unknown fleet_api_type: {args.fleet_api_type}")
+        # Start ServerAppIo API
+        serverappio_server: grpc.Server = run_serverappio_api_grpc(
+            address=serverappio_address,
+            state_factory=state_factory,
+            ffs_factory=ffs_factory,
+            certificates=None,  # ServerAppIo API doesn't support SSL yet
+        )
+        grpc_servers.append(serverappio_server)
+
+        # Start Fleet API
+        if not args.fleet_api_address:
+            if args.fleet_api_type in [
+                TRANSPORT_TYPE_GRPC_RERE,
+                TRANSPORT_TYPE_GRPC_ADAPTER,
+            ]:
+                args.fleet_api_address = FLEET_API_GRPC_RERE_DEFAULT_ADDRESS
+            elif args.fleet_api_type == TRANSPORT_TYPE_REST:
+                args.fleet_api_address = FLEET_API_REST_DEFAULT_ADDRESS
+
+        fleet_address, host, port = _format_address(args.fleet_api_address)
+
+        num_workers = args.fleet_api_num_workers
+        if num_workers != 1:
+            log(
+                WARN,
+                "The Fleet API currently supports only 1 worker. "
+                "You have specified %d workers. "
+                "Support for multiple workers will be added in future releases. "
+                "Proceeding with a single worker.",
+                args.fleet_api_num_workers,
+            )
+            num_workers = 1
+
+        if args.fleet_api_type == TRANSPORT_TYPE_REST:
+            if (
+                importlib.util.find_spec("requests")
+                and importlib.util.find_spec("starlette")
+                and importlib.util.find_spec("uvicorn")
+            ) is None:
+                flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
+
+            fleet_thread = threading.Thread(
+                target=_run_fleet_api_rest,
+                args=(
+                    host,
+                    port,
+                    args.ssl_keyfile,
+                    args.ssl_certfile,
+                    state_factory,
+                    ffs_factory,
+                    num_workers,
+                ),
+                daemon=True,
+            )
+            fleet_thread.start()
+            bckg_threads.append(fleet_thread)
+        elif args.fleet_api_type == TRANSPORT_TYPE_GRPC_RERE:
+            node_public_keys = _try_load_public_keys_node_authentication(args)
+            auto_auth = True
+            if node_public_keys is not None:
+                auto_auth = False
+                state = state_factory.state()
+                state.clear_supernode_auth_keys()
+                state.store_node_public_keys(node_public_keys)
+                log(
+                    INFO,
+                    "Node authentication enabled with %d known public keys",
+                    len(node_public_keys),
+                )
+            else:
+                log(DEBUG, "Automatic node authentication enabled")
+
+            interceptors = [AuthenticateServerInterceptor(state_factory, auto_auth)]
+            if getattr(args, "enable_event_log", None):
+                fleet_log_plugin = _try_obtain_fleet_event_log_writer_plugin()
+                if fleet_log_plugin is not None:
+                    interceptors.append(FleetEventLogInterceptor(fleet_log_plugin))
+                    log(INFO, "Flower Fleet event logging enabled")
+
+            fleet_server = _run_fleet_api_grpc_rere(
+                address=fleet_address,
+                state_factory=state_factory,
+                ffs_factory=ffs_factory,
+                certificates=certificates,
+                interceptors=interceptors,
+            )
+            grpc_servers.append(fleet_server)
+        elif args.fleet_api_type == TRANSPORT_TYPE_GRPC_ADAPTER:
+            fleet_server = _run_fleet_api_grpc_adapter(
+                address=fleet_address,
+                state_factory=state_factory,
+                ffs_factory=ffs_factory,
+                certificates=certificates,
+            )
+            grpc_servers.append(fleet_server)
+        else:
+            raise ValueError(f"Unknown fleet_api_type: {args.fleet_api_type}")
+
+    if args.isolation == ISOLATION_MODE_SUBPROCESS:
+
+        _octet, _colon, _port = serverappio_address.rpartition(":")
+        io_address = (
+            f"{CLIENT_OCTET}:{_port}" if _octet == SERVER_OCTET else serverappio_address
+        )
+        address_arg = (
+            "--simulationio-api-address" if sim_exec else "--serverappio-api-address"
+        )
+        address = simulationio_address if sim_exec else io_address
+        cmd = "flwr-simulation" if sim_exec else "flwr-serverapp"
+
+        # Scheduler thread
+        scheduler_th = threading.Thread(
+            target=_flwr_scheduler,
+            args=(
+                state_factory,
+                address_arg,
+                address,
+                cmd,
+            ),
+            daemon=True,
+        )
+        scheduler_th.start()
+        bckg_threads.append(scheduler_th)
+
+    # Add Dashboard server if available
+    if dashboard_address := getattr(args, "dashboard_address", None):
+        dashboard_address_str, _, _ = _format_address(dashboard_address)
+        dashboard_server = get_dashboard_server(
+            address=dashboard_address_str,
+            state_factory=state_factory,
+            certificates=None,
+        )
+
+        grpc_servers.append(dashboard_server)
 
     # Graceful shutdown
     register_exit_handlers(
         event_type=EventType.RUN_SUPERLINK_LEAVE,
+        exit_message="SuperLink terminated gracefully.",
         grpc_servers=grpc_servers,
-        bckg_threads=bckg_threads,
     )
 
-    # Block
-    while True:
-        if bckg_threads:
-            for thread in bckg_threads:
-                if not thread.is_alive():
-                    sys.exit(1)
-        driver_server.wait_for_termination(timeout=1)
+    # Block until a thread exits prematurely
+    while all(thread.is_alive() for thread in bckg_threads):
+        sleep(0.1)
+
+    # Exit if any thread has exited prematurely
+    # This code will not be reached if the SuperLink stops gracefully
+    flwr_exit(ExitCode.SUPERLINK_THREAD_CRASH)
 
 
-def _try_obtain_certificates(
-    args: argparse.Namespace,
-) -> Optional[Tuple[bytes, bytes, bytes]]:
-    # Obtain certificates
-    if args.insecure:
-        log(WARN, "Option `--insecure` was set. Starting insecure HTTP server.")
-        certificates = None
-    # Check if certificates are provided
-    elif args.certificates:
-        certificates = (
-            Path(args.certificates[0]).read_bytes(),  # CA certificate
-            Path(args.certificates[1]).read_bytes(),  # server certificate
-            Path(args.certificates[2]).read_bytes(),  # server private key
-        )
+def _run_flwr_command(args: list[str], main_pid: int) -> None:
+    # Monitor the main process in case of SIGKILL
+    def main_process_monitor() -> None:
+        while True:
+            sleep(1)
+            if os.getppid() != main_pid:
+                os.kill(os.getpid(), 9)
+
+    threading.Thread(target=main_process_monitor, daemon=True).start()
+
+    # Run the command
+    sys.argv = args
+    if args[0] == "flwr-serverapp":
+        flwr_serverapp()
+    elif args[0] == "flwr-simulation":
+        flwr_simulation()
     else:
-        sys.exit(
-            "Certificates are required unless running in insecure mode. "
-            "Please provide certificate paths with '--certificates' or run the server "
-            "in insecure mode using '--insecure' if you understand the risks."
+        raise ValueError(f"Unknown command: {args[0]}")
+
+
+def _flwr_scheduler(
+    state_factory: LinkStateFactory,
+    io_api_arg: str,
+    io_api_address: str,
+    cmd: str,
+) -> None:
+    log(DEBUG, "Started %s scheduler thread.", cmd)
+    state = state_factory.state()
+    run_id_to_proc: dict[int, multiprocessing.context.SpawnProcess] = {}
+
+    # Use the "spawn" start method for multiprocessing.
+    mp_spawn_context = multiprocessing.get_context("spawn")
+
+    # Periodically check for a pending run in the LinkState
+    while True:
+        sleep(0.1)
+        pending_run_id = state.get_pending_run_id()
+
+        if pending_run_id and pending_run_id not in run_id_to_proc:
+
+            log(
+                INFO,
+                "Launching %s subprocess. Connects to SuperLink on %s",
+                cmd,
+                io_api_address,
+            )
+            # Start subprocess
+            command = [
+                cmd,
+                "--run-once",
+                io_api_arg,
+                io_api_address,
+                "--insecure",
+            ]
+
+            proc = mp_spawn_context.Process(
+                target=_run_flwr_command, args=(command, os.getpid()), daemon=True
+            )
+            proc.start()
+
+            # Store the process
+            run_id_to_proc[pending_run_id] = proc
+
+        # Clean up finished processes
+        for run_id, proc in list(run_id_to_proc.items()):
+            if not proc.is_alive():
+                del run_id_to_proc[run_id]
+
+
+def _format_address(address: str) -> tuple[str, str, int]:
+    parsed_address = parse_address(address)
+    if not parsed_address:
+        flwr_exit(
+            ExitCode.COMMON_ADDRESS_INVALID,
+            f"Address ({address}) cannot be parsed.",
         )
-    return certificates
+    host, port, is_v6 = parsed_address
+    return (f"[{host}]:{port}" if is_v6 else f"{host}:{port}", host, port)
+
+
+def _try_load_public_keys_node_authentication(
+    args: argparse.Namespace,
+) -> Optional[set[bytes]]:
+    """Return a set of node public keys."""
+    if args.auth_superlink_private_key or args.auth_superlink_public_key:
+        log(
+            WARN,
+            "The `--auth-superlink-private-key` and `--auth-superlink-public-key` "
+            "arguments are deprecated and will be removed in a future release. Node "
+            "authentication no longer requires these arguments.",
+        )
+
+    if not args.auth_list_public_keys:
+        return None
+
+    node_keys_file_path = Path(args.auth_list_public_keys)
+    if not node_keys_file_path.exists():
+        sys.exit(
+            "The provided path to the known public keys CSV file does not exist: "
+            f"{node_keys_file_path}. "
+            "Please provide the CSV file path containing known public keys "
+            "to '--auth-list-public-keys'."
+        )
+
+    node_public_keys: set[bytes] = set()
+
+    with open(node_keys_file_path, newline="", encoding="utf-8") as csvfile:
+        reader = csv.reader(csvfile)
+        for row in reader:
+            for element in row:
+                public_key = load_ssh_public_key(element.encode())
+                if isinstance(public_key, ec.EllipticCurvePublicKey):
+                    node_public_keys.add(public_key_to_bytes(public_key))
+                else:
+                    sys.exit(
+                        "Error: Unable to parse the public keys in the CSV "
+                        "file. Please ensure that the CSV file path points to a valid "
+                        "known SSH public keys files and try again."
+                    )
+    return node_public_keys
+
+
+def _try_obtain_exec_auth_plugin(
+    config_path: Path, verify_tls_cert: bool
+) -> Optional[ExecAuthPlugin]:
+    # Load YAML file
+    with config_path.open("r", encoding="utf-8") as file:
+        config: dict[str, Any] = yaml.safe_load(file)
+
+    # Load authentication configuration
+    auth_config: dict[str, Any] = config.get("authentication", {})
+    auth_type: str = auth_config.get(AUTH_TYPE_YAML_KEY, "")
+
+    # Load authentication plugin
+    try:
+        all_plugins: dict[str, type[ExecAuthPlugin]] = get_exec_auth_plugins()
+        auth_plugin_class = all_plugins[auth_type]
+        return auth_plugin_class(
+            user_auth_config_path=config_path, verify_tls_cert=verify_tls_cert
+        )
+    except KeyError:
+        if auth_type != "":
+            sys.exit(
+                f'Authentication type "{auth_type}" is not supported. '
+                "Please provide a valid authentication type in the configuration."
+            )
+        sys.exit("No authentication type is provided in the configuration.")
+    except NotImplementedError:
+        sys.exit("No authentication plugins are currently supported.")
+
+
+def _try_obtain_exec_event_log_writer_plugin() -> Optional[EventLogWriterPlugin]:
+    """Return an instance of the event log writer plugin."""
+    try:
+        all_plugins: dict[str, type[EventLogWriterPlugin]] = (
+            get_exec_event_log_writer_plugins()
+        )
+        plugin_class = all_plugins[EventLogWriterType.STDOUT]
+        return plugin_class()
+    except KeyError:
+        sys.exit("No event log writer plugin is provided.")
+    except NotImplementedError:
+        sys.exit("No event log writer plugins are currently supported.")
+
+
+def _try_obtain_fleet_event_log_writer_plugin() -> Optional[EventLogWriterPlugin]:
+    """Return an instance of the Fleet Servicer event log writer plugin."""
+    try:
+        all_plugins: dict[str, type[EventLogWriterPlugin]] = (
+            get_fleet_event_log_writer_plugins()
+        )
+        plugin_class = all_plugins[EventLogWriterType.STDOUT]
+        return plugin_class()
+    except KeyError:
+        sys.exit("No Fleet API event log writer plugin is provided.")
+    except NotImplementedError:
+        sys.exit("No Fleet API event log writer plugins are currently supported.")
 
 
 def _run_fleet_api_grpc_rere(
     address: str,
-    state_factory: StateFactory,
-    certificates: Optional[Tuple[bytes, bytes, bytes]],
+    state_factory: LinkStateFactory,
+    ffs_factory: FfsFactory,
+    certificates: Optional[tuple[bytes, bytes, bytes]],
+    interceptors: Optional[Sequence[grpc.ServerInterceptor]] = None,
 ) -> grpc.Server:
     """Run Fleet API (gRPC, request-response)."""
     # Create Fleet API gRPC server
     fleet_servicer = FleetServicer(
         state_factory=state_factory,
+        ffs_factory=ffs_factory,
     )
     fleet_add_servicer_to_server_fn = add_FleetServicer_to_server
     fleet_grpc_server = generic_create_grpc_server(
@@ -429,6 +687,7 @@ def _run_fleet_api_grpc_rere(
         server_address=address,
         max_message_length=GRPC_MAX_MESSAGE_LENGTH,
         certificates=certificates,
+        interceptors=interceptors,
     )
 
     log(INFO, "Flower ECE: Starting Fleet API (gRPC-rere) on %s", address)
@@ -437,63 +696,56 @@ def _run_fleet_api_grpc_rere(
     return fleet_grpc_server
 
 
-# pylint: disable=too-many-arguments
-def _run_fleet_api_vce(
-    num_supernodes: int,
-    client_app_attr: str,
-    backend_name: str,
-    backend_config_json_stream: str,
-    app_dir: str,
-    state_factory: StateFactory,
-    f_stop: asyncio.Event,
-) -> None:
-    log(INFO, "Flower VCE: Starting Fleet API (VirtualClientEngine)")
-
-    start_vce(
-        num_supernodes=num_supernodes,
-        client_app_attr=client_app_attr,
-        backend_name=backend_name,
-        backend_config_json_stream=backend_config_json_stream,
+def _run_fleet_api_grpc_adapter(
+    address: str,
+    state_factory: LinkStateFactory,
+    ffs_factory: FfsFactory,
+    certificates: Optional[tuple[bytes, bytes, bytes]],
+) -> grpc.Server:
+    """Run Fleet API (GrpcAdapter)."""
+    # Create Fleet API gRPC server
+    fleet_servicer = GrpcAdapterServicer(
         state_factory=state_factory,
-        app_dir=app_dir,
-        f_stop=f_stop,
+        ffs_factory=ffs_factory,
     )
+    fleet_add_servicer_to_server_fn = add_GrpcAdapterServicer_to_server
+    fleet_grpc_server = generic_create_grpc_server(
+        servicer_and_add_fn=(fleet_servicer, fleet_add_servicer_to_server_fn),
+        server_address=address,
+        max_message_length=GRPC_MAX_MESSAGE_LENGTH,
+        certificates=certificates,
+    )
+
+    log(INFO, "Flower ECE: Starting Fleet API (GrpcAdapter) on %s", address)
+    fleet_grpc_server.start()
+
+    return fleet_grpc_server
 
 
 # pylint: disable=import-outside-toplevel,too-many-arguments
+# pylint: disable=too-many-positional-arguments
 def _run_fleet_api_rest(
     host: str,
     port: int,
     ssl_keyfile: Optional[str],
     ssl_certfile: Optional[str],
-    state_factory: StateFactory,
-    workers: int,
+    state_factory: LinkStateFactory,
+    ffs_factory: FfsFactory,
+    num_workers: int,
 ) -> None:
-    """Run Driver API (REST-based)."""
+    """Run ServerAppIo API (REST-based)."""
     try:
         import uvicorn
 
         from flwr.server.superlink.fleet.rest_rere.rest_api import app as fast_api_app
     except ModuleNotFoundError:
-        sys.exit(MISSING_EXTRA_REST)
-    if workers != 1:
-        raise ValueError(
-            f"The supported number of workers for the Fleet API (REST server) is "
-            f"1. Instead given {workers}. The functionality of >1 workers will be "
-            f"added in the future releases."
-        )
+        flwr_exit(ExitCode.COMMON_MISSING_EXTRA_REST)
+
     log(INFO, "Starting Flower REST server")
 
     # See: https://www.starlette.io/applications/#accessing-the-app-instance
     fast_api_app.state.STATE_FACTORY = state_factory
-
-    validation_exceptions = _validate_ssl_files(
-        ssl_certfile=ssl_certfile, ssl_keyfile=ssl_keyfile
-    )
-    if any(validation_exceptions):
-        # Starting with 3.11 we can use ExceptionGroup but for now
-        # this seems to be the reasonable approach.
-        raise ValueError(validation_exceptions)
+    fast_api_app.state.FFS_FACTORY = ffs_factory
 
     uvicorn.run(
         app="flwr.server.superlink.fleet.rest_rere.rest_api:app",
@@ -503,79 +755,22 @@ def _run_fleet_api_rest(
         access_log=True,
         ssl_keyfile=ssl_keyfile,
         ssl_certfile=ssl_certfile,
-        workers=workers,
+        workers=num_workers,
     )
-
-
-def _validate_ssl_files(
-    ssl_keyfile: Optional[str], ssl_certfile: Optional[str]
-) -> List[ValueError]:
-    validation_exceptions = []
-
-    if ssl_keyfile is not None and not isfile(ssl_keyfile):
-        msg = "Path argument `--ssl-keyfile` does not point to a file."
-        log(ERROR, msg)
-        validation_exceptions.append(ValueError(msg))
-
-    if ssl_certfile is not None and not isfile(ssl_certfile):
-        msg = "Path argument `--ssl-certfile` does not point to a file."
-        log(ERROR, msg)
-        validation_exceptions.append(ValueError(msg))
-
-    if not bool(ssl_keyfile) == bool(ssl_certfile):
-        msg = (
-            "When setting one of `--ssl-keyfile` and "
-            "`--ssl-certfile`, both have to be used."
-        )
-        log(ERROR, msg)
-        validation_exceptions.append(ValueError(msg))
-
-    return validation_exceptions
-
-
-def _parse_args_run_driver_api() -> argparse.ArgumentParser:
-    """Parse command line arguments for Driver API."""
-    parser = argparse.ArgumentParser(
-        description="Start a Flower Driver API server. "
-        "This server will be responsible for "
-        "receiving TaskIns from the Driver script and "
-        "sending them to the Fleet API. Once the client nodes "
-        "are done, they will send the TaskRes back to this Driver API server (through"
-        " the Fleet API) which will then send them back to the Driver script.",
-    )
-
-    _add_args_common(parser=parser)
-    _add_args_driver_api(parser=parser)
-
-    return parser
-
-
-def _parse_args_run_fleet_api() -> argparse.ArgumentParser:
-    """Parse command line arguments for Fleet API."""
-    parser = argparse.ArgumentParser(
-        description="Start a Flower Fleet API server."
-        "This server will be responsible for "
-        "sending TaskIns (received from the Driver API) to the client nodes "
-        "and of receiving TaskRes sent back from those same client nodes once "
-        "they are done. Then, this Fleet API server can send those "
-        "TaskRes back to the Driver API.",
-    )
-
-    _add_args_common(parser=parser)
-    _add_args_fleet_api(parser=parser)
-
-    return parser
 
 
 def _parse_args_run_superlink() -> argparse.ArgumentParser:
-    """Parse command line arguments for both Driver API and Fleet API."""
+    """Parse command line arguments for both ServerAppIo API and Fleet API."""
     parser = argparse.ArgumentParser(
         description="Start a Flower SuperLink",
     )
 
     _add_args_common(parser=parser)
-    _add_args_driver_api(parser=parser)
+    add_ee_args_superlink(parser=parser)
+    _add_args_serverappio_api(parser=parser)
     _add_args_fleet_api(parser=parser)
+    _add_args_exec_api(parser=parser)
+    _add_args_simulationio_api(parser=parser)
 
     return parser
 
@@ -585,17 +780,52 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         "--insecure",
         action="store_true",
         help="Run the server without HTTPS, regardless of whether certificate "
-        "paths are provided. By default, the server runs with HTTPS enabled. "
+        "paths are provided. Data transmitted between the gRPC client and server "
+        "is not encrypted. By default, the server runs with HTTPS enabled. "
         "Use this flag only if you understand the risks.",
     )
     parser.add_argument(
-        "--certificates",
-        nargs=3,
-        metavar=("CA_CERT", "SERVER_CERT", "PRIVATE_KEY"),
+        "--flwr-dir",
+        default=None,
+        help="""The path containing installed Flower Apps.
+        The default directory is:
+
+        - `$FLWR_HOME/` if `$FLWR_HOME` is defined
+        - `$XDG_DATA_HOME/.flwr/` if `$XDG_DATA_HOME` is defined
+        - `$HOME/.flwr/` in all other cases
+        """,
+    )
+    parser.add_argument(
+        "--ssl-certfile",
+        help="Fleet API server SSL certificate file (as a path str) "
+        "to create a secure connection.",
         type=str,
-        help="Paths to the CA certificate, server certificate, and server private "
-        "key, in that order. Note: The server can only be started without "
-        "certificates by enabling the `--insecure` flag.",
+        default=None,
+    )
+    parser.add_argument(
+        "--ssl-keyfile",
+        help="Fleet API server SSL private key file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--ssl-ca-certfile",
+        help="Fleet API server SSL CA certificate file (as a path str) "
+        "to create a secure connection.",
+        type=str,
+    )
+    parser.add_argument(
+        "--isolation",
+        default=ISOLATION_MODE_SUBPROCESS,
+        required=False,
+        choices=[
+            ISOLATION_MODE_SUBPROCESS,
+            ISOLATION_MODE_PROCESS,
+        ],
+        help="Isolation mode when running a `ServerApp` (`subprocess` by default, "
+        "possible values: `subprocess`, `process`). Use `subprocess` to configure "
+        "SuperLink to run a `ServerApp` in a subprocess. Use `process` to indicate "
+        "that a separate independent process gets created outside of SuperLink.",
     )
     parser.add_argument(
         "--database",
@@ -606,108 +836,94 @@ def _add_args_common(parser: argparse.ArgumentParser) -> None:
         "Flower will just create a state in memory.",
         default=DATABASE,
     )
-
-
-def _add_args_driver_api(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "--driver-api-address",
-        help="Driver API (gRPC) server address (IPv4, IPv6, or a domain name)",
-        default=ADDRESS_DRIVER_API,
+        "--storage-dir",
+        help="The base directory to store the objects for the Flower File System.",
+        default=BASE_DIR,
+    )
+    parser.add_argument(
+        "--auth-list-public-keys",
+        type=str,
+        help="A CSV file (as a path str) containing a list of known public "
+        "keys to enable authentication.",
+    )
+    parser.add_argument(
+        "--auth-superlink-private-key",
+        type=str,
+        help="This argument is deprecated and will be removed in a future release.",
+    )
+    parser.add_argument(
+        "--auth-superlink-public-key",
+        type=str,
+        help="This argument is deprecated and will be removed in a future release.",
+    )
+
+
+def _add_args_serverappio_api(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--serverappio-api-address",
+        default=SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS,
+        help="ServerAppIo API (gRPC) server address (IPv4, IPv6, or a domain name). "
+        f"By default, it is set to {SERVERAPPIO_API_DEFAULT_SERVER_ADDRESS}.",
     )
 
 
 def _add_args_fleet_api(parser: argparse.ArgumentParser) -> None:
     # Fleet API transport layer type
-    ex_group = parser.add_mutually_exclusive_group()
-    ex_group.add_argument(
-        "--grpc-rere",
-        action="store_const",
-        dest="fleet_api_type",
-        const=TRANSPORT_TYPE_GRPC_RERE,
+    parser.add_argument(
+        "--fleet-api-type",
         default=TRANSPORT_TYPE_GRPC_RERE,
-        help="Start a Fleet API server (gRPC-rere)",
-    )
-    ex_group.add_argument(
-        "--rest",
-        action="store_const",
-        dest="fleet_api_type",
-        const=TRANSPORT_TYPE_REST,
-        help="Start a Fleet API server (REST, experimental)",
-    )
-
-    ex_group.add_argument(
-        "--vce",
-        action="store_const",
-        dest="fleet_api_type",
-        const=TRANSPORT_TYPE_VCE,
-        help="Start a Fleet API server (VirtualClientEngine)",
-    )
-
-    # Fleet API gRPC-rere options
-    grpc_rere_group = parser.add_argument_group(
-        "Fleet API (gRPC-rere) server options", ""
-    )
-    grpc_rere_group.add_argument(
-        "--grpc-rere-fleet-api-address",
-        help="Fleet API (gRPC-rere) server address (IPv4, IPv6, or a domain name)",
-        default=ADDRESS_FLEET_API_GRPC_RERE,
-    )
-
-    # Fleet API REST options
-    rest_group = parser.add_argument_group("Fleet API (REST) server options", "")
-    rest_group.add_argument(
-        "--rest-fleet-api-address",
-        help="Fleet API (REST) server address (IPv4, IPv6, or a domain name)",
-        default=ADDRESS_FLEET_API_REST,
-    )
-    rest_group.add_argument(
-        "--ssl-certfile",
-        help="Fleet API (REST) server SSL certificate file (as a path str), "
-        "needed for using 'https'.",
-        default=None,
-    )
-    rest_group.add_argument(
-        "--ssl-keyfile",
-        help="Fleet API (REST) server SSL private key file (as a path str), "
-        "needed for using 'https'.",
-        default=None,
-    )
-    rest_group.add_argument(
-        "--rest-fleet-api-workers",
-        help="Set the number of concurrent workers for the Fleet API REST server.",
-        type=int,
-        default=1,
-    )
-
-    # Fleet API VCE options
-    vce_group = parser.add_argument_group("Fleet API (VCE) server options", "")
-    vce_group.add_argument(
-        "--client-app",
-        help="For example: `client:app` or `project.package.module:wrapper.app`.",
-    )
-    vce_group.add_argument(
-        "--num-supernodes",
-        type=int,
-        help="Number of simulated SuperNodes.",
-    )
-    vce_group.add_argument(
-        "--backend",
-        default="ray",
         type=str,
-        help="Simulation backend that executes the ClientApp.",
-    )
-    vce_group.add_argument(
-        "--backend-config",
-        type=str,
-        default='{"client_resources": {"num_cpus":1, "num_gpus":0.0}, "tensorflow": 0}',
-        help='A JSON formatted stream, e.g \'{"<keyA>":<value>, "<keyB>":<value>}\' to '
-        "configure a backend. Values supported in <value> are those included by "
-        "`flwr.common.typing.ConfigsRecordValues`. ",
+        choices=[
+            TRANSPORT_TYPE_GRPC_RERE,
+            TRANSPORT_TYPE_GRPC_ADAPTER,
+            TRANSPORT_TYPE_REST,
+        ],
+        help="Start a gRPC-rere or REST (experimental) Fleet API server.",
     )
     parser.add_argument(
-        "--app-dir",
-        default="",
-        help="Add specified directory to the PYTHONPATH and load"
-        "ClientApp from there."
-        " Default: current working directory.",
+        "--fleet-api-address",
+        help="Fleet API server address (IPv4, IPv6, or a domain name).",
+    )
+    parser.add_argument(
+        "--fleet-api-num-workers",
+        default=1,
+        type=int,
+        help="Set the number of concurrent workers for the Fleet API server.",
+    )
+
+
+def _add_args_exec_api(parser: argparse.ArgumentParser) -> None:
+    """Add command line arguments for Exec API."""
+    parser.add_argument(
+        "--exec-api-address",
+        help="Exec API server address (IPv4, IPv6, or a domain name) "
+        f"By default, it is set to {EXEC_API_DEFAULT_SERVER_ADDRESS}.",
+        default=EXEC_API_DEFAULT_SERVER_ADDRESS,
+    )
+    parser.add_argument(
+        "--executor",
+        help="For example: `deployment:exec` or `project.package.module:wrapper.exec`. "
+        "The default is `flwr.superexec.deployment:executor`",
+        default="flwr.superexec.deployment:executor",
+    )
+    parser.add_argument(
+        "--executor-dir",
+        help="The directory for the executor.",
+        default=".",
+    )
+    parser.add_argument(
+        "--executor-config",
+        help="Key-value pairs for the executor config, separated by spaces. "
+        "For example:\n\n`--executor-config 'verbose=true "
+        'root-certificates="certificates/superlink-ca.crt"\'`',
+    )
+
+
+def _add_args_simulationio_api(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--simulationio-api-address",
+        default=SIMULATIONIO_API_DEFAULT_SERVER_ADDRESS,
+        help="SimulationIo API (gRPC) server address (IPv4, IPv6, or a domain name)."
+        f"By default, it is set to {SIMULATIONIO_API_DEFAULT_SERVER_ADDRESS}.",
     )

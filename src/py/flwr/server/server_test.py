@@ -15,9 +15,14 @@
 """Flower server tests."""
 
 
-from typing import List, Optional
+import argparse
+import csv
+import tempfile
+from pathlib import Path
+from typing import Optional
 
 import numpy as np
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from flwr.common import (
     Code,
@@ -35,8 +40,13 @@ from flwr.common import (
     Status,
     ndarray_to_bytes,
 )
+from flwr.common.secure_aggregation.crypto.symmetric_encryption import (
+    generate_key_pairs,
+    public_key_to_bytes,
+)
 from flwr.server.client_manager import SimpleClientManager
 
+from .app import _try_load_public_keys_node_authentication
 from .client_proxy import ClientProxy
 from .server import Server, evaluate_clients, fit_clients
 
@@ -124,7 +134,7 @@ class FailingClient(ClientProxy):
 def test_fit_clients() -> None:
     """Test fit_clients."""
     # Prepare
-    clients: List[ClientProxy] = [
+    clients: list[ClientProxy] = [
         FailingClient("0"),
         SuccessClient("1"),
     ]
@@ -145,7 +155,7 @@ def test_fit_clients() -> None:
 def test_eval_clients() -> None:
     """Test eval_clients."""
     # Prepare
-    clients: List[ClientProxy] = [
+    clients: list[ClientProxy] = [
         FailingClient("0"),
         SuccessClient("1"),
     ]
@@ -182,3 +192,46 @@ def test_set_max_workers() -> None:
 
     # Assert
     assert server.max_workers == 42
+
+
+def test_setup_node_auth() -> None:  # pylint: disable=R0914
+    """Test setup node authentication."""
+    # Prepare
+    _, first_public_key = generate_key_pairs()
+    _, second_public_key = generate_key_pairs()
+
+    # Execute
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Initialize temporary files
+        node_keys_file_path = Path(temp_dir) / "node_keys.csv"
+
+        # Fill the files with relevant keys
+        with open(node_keys_file_path, "w", newline="", encoding="utf-8") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(
+                [
+                    first_public_key.public_bytes(
+                        encoding=Encoding.OpenSSH, format=PublicFormat.OpenSSH
+                    ).decode(),
+                    second_public_key.public_bytes(
+                        encoding=Encoding.OpenSSH, format=PublicFormat.OpenSSH
+                    ).decode(),
+                ]
+            )
+
+        # Mock argparse with `require-node-authentication`` flag
+        mock_args = argparse.Namespace(
+            auth_list_public_keys=str(node_keys_file_path),
+            auth_superlink_private_key="",
+            auth_superlink_public_key="",
+        )
+
+        # Run _try_setup_node_authentication
+        node_pks = _try_load_public_keys_node_authentication(mock_args)
+
+        # Assert
+        assert node_pks is not None
+        assert node_pks == {
+            public_key_to_bytes(first_public_key),
+            public_key_to_bytes(second_public_key),
+        }

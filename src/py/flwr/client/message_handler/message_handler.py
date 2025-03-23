@@ -1,4 +1,4 @@
-# Copyright 2020 Flower Labs GmbH. All Rights Reserved.
+# Copyright 2022 Flower Labs GmbH. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 
 from logging import WARN
-from typing import Optional, Tuple, cast
+from typing import Optional, cast
 
 from flwr.client.client import (
     maybe_call_evaluate,
@@ -25,18 +25,18 @@ from flwr.client.client import (
     maybe_call_get_properties,
 )
 from flwr.client.numpy_client import NumPyClient
-from flwr.client.typing import ClientFn
-from flwr.common import ConfigsRecord, Context, Message, Metadata, RecordSet, log
+from flwr.client.typing import ClientFnExt
+from flwr.common import ConfigRecord, Context, Message, Metadata, RecordDict, log
 from flwr.common.constant import MessageType, MessageTypeLegacy
-from flwr.common.recordset_compat import (
-    evaluateres_to_recordset,
-    fitres_to_recordset,
-    getparametersres_to_recordset,
-    getpropertiesres_to_recordset,
-    recordset_to_evaluateins,
-    recordset_to_fitins,
-    recordset_to_getparametersins,
-    recordset_to_getpropertiesins,
+from flwr.common.recorddict_compat import (
+    evaluateres_to_recorddict,
+    fitres_to_recorddict,
+    getparametersres_to_recorddict,
+    getpropertiesres_to_recorddict,
+    recorddict_to_evaluateins,
+    recorddict_to_fitins,
+    recorddict_to_getparametersins,
+    recorddict_to_getpropertiesins,
 )
 from flwr.proto.transport_pb2 import (  # pylint: disable=E0611
     ClientMessage,
@@ -53,7 +53,7 @@ class UnknownServerMessage(Exception):
     """Exception indicating that the received message is unknown."""
 
 
-def handle_control_message(message: Message) -> Tuple[Optional[Message], int]:
+def handle_control_message(message: Message) -> tuple[Optional[Message], int]:
     """Handle control part of the incoming message.
 
     Parameters
@@ -70,19 +70,19 @@ def handle_control_message(message: Message) -> Tuple[Optional[Message], int]:
         Number of seconds that the client should disconnect from the server.
     """
     if message.metadata.message_type == "reconnect":
-        # Retrieve ReconnectIns from recordset
-        recordset = message.content
-        seconds = cast(int, recordset.configs_records["config"]["seconds"])
+        # Retrieve ReconnectIns from RecordDict
+        recorddict = message.content
+        seconds = cast(int, recorddict.config_records["config"]["seconds"])
         # Construct ReconnectIns and call _reconnect
         disconnect_msg, sleep_duration = _reconnect(
             ServerMessage.ReconnectIns(seconds=seconds)
         )
-        # Store DisconnectRes in recordset
+        # Store DisconnectRes in RecordDict
         reason = cast(int, disconnect_msg.disconnect_res.reason)
-        recordset = RecordSet()
-        recordset.configs_records["config"] = ConfigsRecord({"reason": reason})
-        out_message = message.create_reply(recordset)
-        # Return TaskRes and sleep duration
+        recorddict = RecordDict()
+        recorddict.config_records["config"] = ConfigRecord({"reason": reason})
+        out_message = Message(recorddict, reply_to=message)
+        # Return Message and sleep duration
         return out_message, sleep_duration
 
     # Any other message
@@ -90,10 +90,10 @@ def handle_control_message(message: Message) -> Tuple[Optional[Message], int]:
 
 
 def handle_legacy_message_from_msgtype(
-    client_fn: ClientFn, message: Message, context: Context
+    client_fn: ClientFnExt, message: Message, context: Context
 ) -> Message:
     """Handle legacy message in the inner most mod."""
-    client = client_fn(str(message.metadata.partition_id))
+    client = client_fn(context)
 
     # Check if NumPyClient is returend
     if isinstance(client, NumPyClient):
@@ -105,50 +105,48 @@ def handle_legacy_message_from_msgtype(
             "Please use `NumPyClient.to_client()` method to convert it to `Client`.",
         )
 
-    client.set_context(context)
-
     message_type = message.metadata.message_type
 
     # Handle GetPropertiesIns
     if message_type == MessageTypeLegacy.GET_PROPERTIES:
         get_properties_res = maybe_call_get_properties(
             client=client,
-            get_properties_ins=recordset_to_getpropertiesins(message.content),
+            get_properties_ins=recorddict_to_getpropertiesins(message.content),
         )
-        out_recordset = getpropertiesres_to_recordset(get_properties_res)
+        out_recorddict = getpropertiesres_to_recorddict(get_properties_res)
     # Handle GetParametersIns
     elif message_type == MessageTypeLegacy.GET_PARAMETERS:
         get_parameters_res = maybe_call_get_parameters(
             client=client,
-            get_parameters_ins=recordset_to_getparametersins(message.content),
+            get_parameters_ins=recorddict_to_getparametersins(message.content),
         )
-        out_recordset = getparametersres_to_recordset(
+        out_recorddict = getparametersres_to_recorddict(
             get_parameters_res, keep_input=False
         )
     # Handle FitIns
     elif message_type == MessageType.TRAIN:
         fit_res = maybe_call_fit(
             client=client,
-            fit_ins=recordset_to_fitins(message.content, keep_input=True),
+            fit_ins=recorddict_to_fitins(message.content, keep_input=True),
         )
-        out_recordset = fitres_to_recordset(fit_res, keep_input=False)
+        out_recorddict = fitres_to_recorddict(fit_res, keep_input=False)
     # Handle EvaluateIns
     elif message_type == MessageType.EVALUATE:
         evaluate_res = maybe_call_evaluate(
             client=client,
-            evaluate_ins=recordset_to_evaluateins(message.content, keep_input=True),
+            evaluate_ins=recorddict_to_evaluateins(message.content, keep_input=True),
         )
-        out_recordset = evaluateres_to_recordset(evaluate_res)
+        out_recorddict = evaluateres_to_recorddict(evaluate_res)
     else:
         raise ValueError(f"Invalid message type: {message_type}")
 
     # Return Message
-    return message.create_reply(out_recordset)
+    return Message(out_recorddict, reply_to=message)
 
 
 def _reconnect(
     reconnect_msg: ServerMessage.ReconnectIns,
-) -> Tuple[ClientMessage, int]:
+) -> tuple[ClientMessage, int]:
     # Determine the reason for sending DisconnectRes message
     reason = Reason.ACK
     sleep_duration = None
@@ -169,7 +167,7 @@ def validate_out_message(out_message: Message, in_message_metadata: Metadata) ->
         and out_meta.message_id == ""  # This will be generated by the server
         and out_meta.src_node_id == in_meta.dst_node_id
         and out_meta.dst_node_id == in_meta.src_node_id
-        and out_meta.reply_to_message == in_meta.message_id
+        and out_meta.reply_to_message_id == in_meta.message_id
         and out_meta.group_id == in_meta.group_id
         and out_meta.message_type == in_meta.message_type
         and out_meta.created_at > in_meta.created_at
